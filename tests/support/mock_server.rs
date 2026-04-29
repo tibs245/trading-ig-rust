@@ -22,7 +22,7 @@ use super::fixtures;
 use super::matchers::{HasApiKey, HasVersion};
 
 pub struct IgMockServer {
-    server: MockServer,
+    pub server: MockServer,
 }
 
 impl IgMockServer {

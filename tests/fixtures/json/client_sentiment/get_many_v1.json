@@ -1,0 +1,19 @@
+{
+  "clientSentiments": [
+    {
+      "marketId": "CC.D.LCO.UNC.IP",
+      "longPositionPercentage": 68.0,
+      "shortPositionPercentage": 32.0
+    },
+    {
+      "marketId": "IX.D.DAX.IFD.IP",
+      "longPositionPercentage": 45.5,
+      "shortPositionPercentage": 54.5
+    },
+    {
+      "marketId": "CS.D.GBPUSD.TODAY.IP",
+      "longPositionPercentage": 72.3,
+      "shortPositionPercentage": 27.7
+    }
+  ]
+}
