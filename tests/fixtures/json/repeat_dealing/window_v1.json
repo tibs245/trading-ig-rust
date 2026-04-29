@@ -1,0 +1,14 @@
+{
+  "repeatDealingWindows": [
+    {
+      "epic": "CS.D.GBPUSD.TODAY.IP",
+      "validFrom": "2024-01-15T10:00:00",
+      "validTo": "2024-01-15T10:30:00"
+    },
+    {
+      "epic": "IX.D.DAX.IFD.IP",
+      "validFrom": "2024-01-15T09:45:00",
+      "validTo": "2024-01-15T10:15:00"
+    }
+  ]
+}

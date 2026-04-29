@@ -1,0 +1,14 @@
+{
+  "clientSentiments": [
+    {
+      "marketId": "IX.D.DAX.IFD.IP",
+      "longPositionPercentage": 45.5,
+      "shortPositionPercentage": 54.5
+    },
+    {
+      "marketId": "IX.D.FTSE.IFD.IP",
+      "longPositionPercentage": 61.0,
+      "shortPositionPercentage": 39.0
+    }
+  ]
+}

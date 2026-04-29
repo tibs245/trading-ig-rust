@@ -1,0 +1,12 @@
+{
+  "name": "My Trading App",
+  "apiKey": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+  "status": "DISABLED",
+  "allowanceAccountOverall": 60,
+  "allowanceAccountTrading": 10,
+  "allowanceApplicationOverall": 60,
+  "concurrentSubscriptionsLimit": 40,
+  "allowEquities": true,
+  "allowQuoteOrders": false,
+  "createdDate": "2023-06-01T08:30:00"
+}

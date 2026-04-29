@@ -9,9 +9,12 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod client;
+pub mod client_sentiment;
 pub mod config;
 pub mod error;
 pub mod models;
+pub mod operations;
+pub mod repeat_dealing;
 pub mod session;
 pub mod time;
 

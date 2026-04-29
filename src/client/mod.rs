@@ -23,7 +23,10 @@ pub use builder::IgClientBuilder;
 
 use std::sync::Arc;
 
+use crate::client_sentiment::ClientSentimentApi;
 use crate::config::IgConfig;
+use crate::operations::OperationsApi;
+use crate::repeat_dealing::RepeatDealingApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
 use http::Transport;
@@ -57,5 +60,20 @@ impl IgClient {
                 credentials: self.credentials.clone(),
             },
         }
+    }
+
+    /// Client sentiment API: long/short percentages for IG markets.
+    pub fn client_sentiment(&self) -> ClientSentimentApi<'_> {
+        ClientSentimentApi { client: self }
+    }
+
+    /// Repeat dealing API: windows for re-trading recently dealt instruments.
+    pub fn repeat_dealing(&self) -> RepeatDealingApi<'_> {
+        RepeatDealingApi { client: self }
+    }
+
+    /// Operations API: manage API application keys.
+    pub fn operations(&self) -> OperationsApi<'_> {
+        OperationsApi { client: self }
     }
 }
