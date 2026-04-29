@@ -1,0 +1,9 @@
+{
+  "accountId": "ABC123",
+  "clientId": "999999",
+  "accountType": "CFD",
+  "currency": "EUR",
+  "locale": "fr_FR",
+  "timezoneOffset": 60,
+  "lightstreamerEndpoint": "https://demo-apd.marketdatasystems.com"
+}
