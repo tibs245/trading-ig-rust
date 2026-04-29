@@ -1,0 +1,126 @@
+{
+  "marketDetails": [
+    {
+      "instrument": {
+        "epic": "CS.D.EURUSD.TODAY.IP",
+        "name": "EUR/USD",
+        "status": "TRADEABLE",
+        "type": "CURRENCIES",
+        "expiry": "DFB",
+        "lotSize": 1.0,
+        "unit": "AMOUNT",
+        "high": 1.1250,
+        "low": 1.1180,
+        "percentageChange": 0.12,
+        "netChange": 0.0013,
+        "bid": 1.1220,
+        "offer": 1.1222,
+        "updateTime": "14:30:00",
+        "updateTimeUTC": "14:30:00",
+        "delayTime": 0,
+        "streamingPricesAvailable": true,
+        "marketStatus": "TRADEABLE",
+        "scalingFactor": 1,
+        "currencies": [
+          { "code": "USD", "name": "US Dollar", "symbol": "$", "isDefault": true }
+        ],
+        "rolloverDetails": null,
+        "sprintMarketsMinimumExpiryTime": null,
+        "sprintMarketsMaximumExpiryTime": null,
+        "marginFactor": 0.05,
+        "marginFactorUnit": "PERCENTAGE",
+        "slippageFactor": { "unit": "pct", "value": 50.0 },
+        "limitedRiskPremium": { "unit": "POINTS", "value": 0.6 },
+        "openingHours": null,
+        "expiryDetails": null,
+        "specialInfo": []
+      },
+      "dealingRules": {
+        "minStepDistance": { "unit": "POINTS", "value": 1.0 },
+        "minDealSize": { "unit": "AMOUNT", "value": 0.5 },
+        "minControlledRiskStopDistance": { "unit": "POINTS", "value": 20.0 },
+        "minNormalStopOrLimitDistance": { "unit": "POINTS", "value": 0.0 },
+        "maxStopOrLimitDistance": { "unit": "PERCENTAGE", "value": 75.0 },
+        "controlledRiskSpacing": { "unit": "POINTS", "value": 0.6 },
+        "marketOrderPreference": "AVAILABLE_DEFAULT_ON",
+        "trailingStopsPreference": "AVAILABLE"
+      },
+      "snapshot": {
+        "marketStatus": "TRADEABLE",
+        "netChange": 0.0013,
+        "percentageChange": 0.12,
+        "updateTime": "14:30:00",
+        "delayTime": 0,
+        "bid": 1.1220,
+        "offer": 1.1222,
+        "high": 1.1250,
+        "low": 1.1180,
+        "binaryOdds": null,
+        "decimalPlacesFactor": 4,
+        "scalingFactor": 1,
+        "controlledRiskExtraSpread": 0.6
+      }
+    },
+    {
+      "instrument": {
+        "epic": "IX.D.FTSE.DAILY.IP",
+        "name": "FTSE 100",
+        "status": "TRADEABLE",
+        "type": "INDICES",
+        "expiry": "DFB",
+        "lotSize": 1.0,
+        "unit": "AMOUNT",
+        "high": 7520.0,
+        "low": 7480.0,
+        "percentageChange": 0.25,
+        "netChange": 18.5,
+        "bid": 7505.0,
+        "offer": 7506.0,
+        "updateTime": "14:31:00",
+        "updateTimeUTC": "14:31:00",
+        "delayTime": 0,
+        "streamingPricesAvailable": true,
+        "marketStatus": "TRADEABLE",
+        "scalingFactor": 1,
+        "currencies": [
+          { "code": "GBP", "name": "Pound Sterling", "symbol": "£", "isDefault": true }
+        ],
+        "rolloverDetails": null,
+        "sprintMarketsMinimumExpiryTime": null,
+        "sprintMarketsMaximumExpiryTime": null,
+        "marginFactor": 0.05,
+        "marginFactorUnit": "PERCENTAGE",
+        "slippageFactor": { "unit": "pct", "value": 50.0 },
+        "limitedRiskPremium": { "unit": "POINTS", "value": 3.0 },
+        "openingHours": null,
+        "expiryDetails": null,
+        "specialInfo": []
+      },
+      "dealingRules": {
+        "minStepDistance": { "unit": "POINTS", "value": 1.0 },
+        "minDealSize": { "unit": "AMOUNT", "value": 0.5 },
+        "minControlledRiskStopDistance": { "unit": "POINTS", "value": 20.0 },
+        "minNormalStopOrLimitDistance": { "unit": "POINTS", "value": 0.0 },
+        "maxStopOrLimitDistance": { "unit": "PERCENTAGE", "value": 75.0 },
+        "controlledRiskSpacing": { "unit": "POINTS", "value": 3.0 },
+        "marketOrderPreference": "AVAILABLE_DEFAULT_ON",
+        "trailingStopsPreference": "AVAILABLE"
+      },
+      "snapshot": {
+        "marketStatus": "TRADEABLE",
+        "netChange": 18.5,
+        "percentageChange": 0.25,
+        "updateTime": "14:31:00",
+        "delayTime": 0,
+        "bid": 7505.0,
+        "offer": 7506.0,
+        "high": 7520.0,
+        "low": 7480.0,
+        "binaryOdds": null,
+        "decimalPlacesFactor": 1,
+        "scalingFactor": 1,
+        "controlledRiskExtraSpread": 3.0
+      }
+    }
+  ]
+}
