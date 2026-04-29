@@ -61,12 +61,39 @@ IG_API_KEY=xxx IG_USERNAME=you IG_PASSWORD=secret \
 
 ## Cargo features
 
-| feature       | default | description                              |
-| ------------- | ------- | ---------------------------------------- |
-| `rustls-tls`  | yes     | TLS via `rustls`                         |
-| `native-tls`  | no      | TLS via system OpenSSL                   |
-| `stream`      | no      | Lightstreamer streaming client           |
-| `encryption`  | no      | Encrypted-password login (RSA)           |
+| feature        | default | description                                              |
+| -------------- | ------- | -------------------------------------------------------- |
+| `rustls-tls`   | yes     | TLS via `rustls`                                         |
+| `native-tls`   | no      | TLS via system OpenSSL                                   |
+| `stream`       | no      | Lightstreamer streaming client                           |
+| `encryption`   | no      | Encrypted-password login (RSA)                           |
+| `live`         | no      | Compile the live integration test suite (read-only path) |
+| `live-trading` | no      | Also compile write/mutation live tests (implies `live`)  |
+
+## Live integration tests
+
+A separate test file (`tests/live_integration.rs`) exercises the real IG Demo
+API end-to-end.  All tests are `#[ignore]`d and require explicit credentials,
+so they never run in CI.
+
+**Read-only tests** (session, accounts, markets, prices, positions, watchlists,
+client sentiment, history):
+
+```bash
+IG_API_KEY=your-key IG_USERNAME=you IG_PASSWORD=secret \
+  cargo test --features live --ignored --test live_integration
+```
+
+**Write / mutation tests** (watchlist create/delete, preferences round-trip)
+additionally require the `live-trading` feature **and** `IG_LIVE_TRADING_OK=1`:
+
+```bash
+IG_API_KEY=your-key IG_USERNAME=you IG_PASSWORD=secret IG_LIVE_TRADING_OK=1 \
+  cargo test --features live-trading --ignored --test live_integration
+```
+
+If `IG_API_KEY` is absent the whole suite skips gracefully, so
+`cargo test --all-features` in CI passes without hitting the network.
 
 ## Project knowledge
 
