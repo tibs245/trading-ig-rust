@@ -404,6 +404,172 @@ fn parse_ig_numeric(s: &str) -> Option<f64> {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Polars conversions
+// ────────────────────────────────────────────────────────────────────────────
+
+#[cfg(feature = "polars")]
+impl crate::dataframe::IntoDataFrame for Vec<Activity> {
+    /// Convert a list of v3 activities into a `polars::prelude::DataFrame`.
+    ///
+    /// Column layout:
+    ///
+    /// | column          | dtype      | nullable |
+    /// | --------------- | ---------- | -------- |
+    /// | `date`          | `Datetime` | no       |
+    /// | `epic`          | `Utf8`     | no       |
+    /// | `period`        | `Utf8`     | no       |
+    /// | `deal_id`       | `Utf8`     | no       |
+    /// | `channel`       | `Utf8`     | no       |
+    /// | `activity_type` | `Utf8`     | no       |
+    /// | `status`        | `Utf8`     | no       |
+    /// | `description`   | `Utf8`     | no       |
+    fn to_dataframe(&self) -> crate::Result<polars::prelude::DataFrame> {
+        use polars::prelude::*;
+
+        let date: Vec<chrono::NaiveDateTime> = self.iter().map(|a| a.date).collect();
+        let epic: Vec<&str> = self.iter().map(|a| a.epic.as_str()).collect();
+        let period: Vec<&str> = self.iter().map(|a| a.period.as_str()).collect();
+        let deal_id: Vec<&str> = self.iter().map(|a| a.deal_id.as_str()).collect();
+        let channel: Vec<&str> = self
+            .iter()
+            .map(|a| activity_channel_str(a.channel))
+            .collect();
+        let activity_type: Vec<&str> = self
+            .iter()
+            .map(|a| activity_type_str(a.activity_type))
+            .collect();
+        let status: Vec<&str> = self.iter().map(|a| activity_status_str(a.status)).collect();
+        let description: Vec<&str> = self.iter().map(|a| a.description.as_str()).collect();
+
+        let date_series = Series::new("date".into(), date);
+
+        DataFrame::new(vec![
+            date_series.into(),
+            Column::new("epic".into(), epic),
+            Column::new("period".into(), period),
+            Column::new("deal_id".into(), deal_id),
+            Column::new("channel".into(), channel),
+            Column::new("activity_type".into(), activity_type),
+            Column::new("status".into(), status),
+            Column::new("description".into(), description),
+        ])
+        .map_err(|e| crate::Error::Config(format!("polars conversion failed: {e}")))
+    }
+}
+
+#[cfg(feature = "polars")]
+fn activity_channel_str(c: ActivityChannel) -> &'static str {
+    match c {
+        ActivityChannel::Web => "WEB",
+        ActivityChannel::Mobile => "MOBILE",
+        ActivityChannel::Dealer => "DEALER",
+        ActivityChannel::PublicWebApi => "PUBLIC_WEB_API",
+        ActivityChannel::System => "SYSTEM",
+        ActivityChannel::Unknown => "UNKNOWN",
+    }
+}
+
+#[cfg(feature = "polars")]
+fn activity_type_str(t: ActivityType) -> &'static str {
+    match t {
+        ActivityType::Position => "POSITION",
+        ActivityType::WorkingOrder => "WORKING_ORDER",
+        ActivityType::Edit => "EDIT",
+        ActivityType::System => "SYSTEM",
+        ActivityType::Unknown => "UNKNOWN",
+    }
+}
+
+#[cfg(feature = "polars")]
+fn activity_status_str(s: ActivityStatus) -> &'static str {
+    match s {
+        ActivityStatus::Accepted => "ACCEPTED",
+        ActivityStatus::Rejected => "REJECTED",
+        ActivityStatus::Unknown => "UNKNOWN",
+    }
+}
+
+#[cfg(feature = "polars")]
+impl crate::dataframe::IntoDataFrame for Vec<Transaction> {
+    /// Convert a list of transactions into a `polars::prelude::DataFrame`.
+    ///
+    /// Stringified numeric IG fields are retained as `Utf8` columns with the
+    /// raw string values (which may include currency symbols, e.g.
+    /// `"EUR1234.56"`). Alongside each, a `_value` `Float64` column is added
+    /// with the parsed number (`null` when the string cannot be parsed).
+    ///
+    /// Column layout:
+    ///
+    /// | column                  | dtype      | nullable |
+    /// | ----------------------- | ---------- | -------- |
+    /// | `date`                  | `Utf8`     | no       |
+    /// | `date_utc`              | `Datetime` | no       |
+    /// | `instrument_name`       | `Utf8`     | no       |
+    /// | `period`                | `Utf8`     | no       |
+    /// | `transaction_type`      | `Utf8`     | no       |
+    /// | `reference`             | `Utf8`     | no       |
+    /// | `currency`              | `Utf8`     | no       |
+    /// | `cash_transaction`      | `Boolean`  | no       |
+    /// | `profit_and_loss`       | `Utf8`     | no       |
+    /// | `profit_and_loss_value` | `Float64`  | yes      |
+    /// | `open_level`            | `Utf8`     | no       |
+    /// | `open_level_value`      | `Float64`  | yes      |
+    /// | `close_level`           | `Utf8`     | no       |
+    /// | `close_level_value`     | `Float64`  | yes      |
+    /// | `size`                  | `Utf8`     | no       |
+    /// | `size_value`            | `Float64`  | yes      |
+    fn to_dataframe(&self) -> crate::Result<polars::prelude::DataFrame> {
+        use polars::prelude::*;
+
+        let date: Vec<&str> = self.iter().map(|t| t.date.as_str()).collect();
+        let date_utc: Vec<chrono::NaiveDateTime> = self.iter().map(|t| t.date_utc).collect();
+        let instrument_name: Vec<&str> = self.iter().map(|t| t.instrument_name.as_str()).collect();
+        let period: Vec<&str> = self.iter().map(|t| t.period.as_str()).collect();
+        let transaction_type: Vec<&str> =
+            self.iter().map(|t| t.transaction_type.as_str()).collect();
+        let reference: Vec<&str> = self.iter().map(|t| t.reference.as_str()).collect();
+        let currency: Vec<&str> = self.iter().map(|t| t.currency.as_str()).collect();
+        let cash_transaction: Vec<bool> = self.iter().map(|t| t.cash_transaction).collect();
+        // Raw string columns (preserve currency symbol, sign, etc.)
+        let profit_and_loss: Vec<&str> = self.iter().map(|t| t.profit_and_loss.as_str()).collect();
+        let profit_and_loss_value: Vec<Option<f64>> = self
+            .iter()
+            .map(Transaction::profit_and_loss_value)
+            .collect();
+        let open_level: Vec<&str> = self.iter().map(|t| t.open_level.as_str()).collect();
+        let open_level_value: Vec<Option<f64>> =
+            self.iter().map(Transaction::open_level_value).collect();
+        let close_level: Vec<&str> = self.iter().map(|t| t.close_level.as_str()).collect();
+        let close_level_value: Vec<Option<f64>> =
+            self.iter().map(Transaction::close_level_value).collect();
+        let size: Vec<&str> = self.iter().map(|t| t.size.as_str()).collect();
+        let size_value: Vec<Option<f64>> = self.iter().map(Transaction::size_value).collect();
+
+        let date_utc_series = Series::new("date_utc".into(), date_utc);
+
+        DataFrame::new(vec![
+            Column::new("date".into(), date),
+            date_utc_series.into(),
+            Column::new("instrument_name".into(), instrument_name),
+            Column::new("period".into(), period),
+            Column::new("transaction_type".into(), transaction_type),
+            Column::new("reference".into(), reference),
+            Column::new("currency".into(), currency),
+            Column::new("cash_transaction".into(), cash_transaction),
+            Column::new("profit_and_loss".into(), profit_and_loss),
+            Column::new("profit_and_loss_value".into(), profit_and_loss_value),
+            Column::new("open_level".into(), open_level),
+            Column::new("open_level_value".into(), open_level_value),
+            Column::new("close_level".into(), close_level),
+            Column::new("close_level_value".into(), close_level_value),
+            Column::new("size".into(), size),
+            Column::new("size_value".into(), size_value),
+        ])
+        .map_err(|e| crate::Error::Config(format!("polars conversion failed: {e}")))
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Internal pagination types
 // ────────────────────────────────────────────────────────────────────────────
 

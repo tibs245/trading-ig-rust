@@ -266,3 +266,112 @@ pub(super) struct UpdatePositionResponse {
 pub(super) struct ClosePositionResponse {
     pub deal_reference: DealReference,
 }
+
+// ---------------------------------------------------------------------------
+// Polars conversion
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "polars")]
+impl crate::dataframe::IntoDataFrame for Vec<PositionV2> {
+    /// Convert a list of v2 positions into a `polars::prelude::DataFrame`.
+    ///
+    /// Column layout:
+    ///
+    /// | column                   | dtype      | nullable |
+    /// | ------------------------ | ---------- | -------- |
+    /// | `deal_id`                | `Utf8`     | no       |
+    /// | `deal_reference`         | `Utf8`     | no       |
+    /// | `direction`              | `Utf8`     | no       |
+    /// | `size`                   | `Float64`  | no       |
+    /// | `level`                  | `Float64`  | no       |
+    /// | `limit_level`            | `Float64`  | yes      |
+    /// | `stop_level`             | `Float64`  | yes      |
+    /// | `controlled_risk`        | `Boolean`  | no       |
+    /// | `contract_size`          | `Float64`  | no       |
+    /// | `created_date`           | `Utf8`     | no       |
+    /// | `created_date_utc`       | `Datetime` | yes      |
+    /// | `trailing_step`          | `Float64`  | yes      |
+    /// | `trailing_stop_distance` | `Float64`  | yes      |
+    /// | `market_epic`            | `Utf8`     | yes      |
+    /// | `market_bid`             | `Float64`  | yes      |
+    /// | `market_offer`           | `Float64`  | yes      |
+    /// | `market_status`          | `Utf8`     | no       |
+    fn to_dataframe(&self) -> crate::Result<polars::prelude::DataFrame> {
+        use polars::prelude::*;
+
+        let deal_id: Vec<&str> = self.iter().map(|p| p.deal_id.as_str()).collect();
+        let deal_reference: Vec<&str> = self.iter().map(|p| p.deal_reference.as_str()).collect();
+        let direction: Vec<&str> = self
+            .iter()
+            .map(|p| match p.direction {
+                crate::models::common::Direction::Buy => "BUY",
+                crate::models::common::Direction::Sell => "SELL",
+            })
+            .collect();
+        let size: Vec<f64> = self.iter().map(|p| p.size).collect();
+        let level: Vec<f64> = self.iter().map(|p| p.level).collect();
+        let limit_level: Vec<Option<f64>> = self.iter().map(|p| p.limit_level).collect();
+        let stop_level: Vec<Option<f64>> = self.iter().map(|p| p.stop_level).collect();
+        let controlled_risk: Vec<bool> = self.iter().map(|p| p.controlled_risk).collect();
+        let contract_size: Vec<f64> = self.iter().map(|p| p.contract_size).collect();
+        let created_date: Vec<&str> = self.iter().map(|p| p.created_date.as_str()).collect();
+        let created_date_utc: Vec<Option<NaiveDateTime>> =
+            self.iter().map(|p| p.created_date_utc).collect();
+        let trailing_step: Vec<Option<f64>> = self.iter().map(|p| p.trailing_step).collect();
+        let trailing_stop_distance: Vec<Option<f64>> =
+            self.iter().map(|p| p.trailing_stop_distance).collect();
+        let market_epic: Vec<Option<&str>> = self
+            .iter()
+            .map(|p| {
+                p.market
+                    .epic
+                    .as_ref()
+                    .map(crate::models::common::Epic::as_str)
+            })
+            .collect();
+        let market_bid: Vec<Option<f64>> = self.iter().map(|p| p.market.bid).collect();
+        let market_offer: Vec<Option<f64>> = self.iter().map(|p| p.market.offer).collect();
+        let market_status: Vec<&str> = self
+            .iter()
+            .map(|p| market_status_str(p.market.market_status))
+            .collect();
+
+        let created_date_utc_series = Series::new("created_date_utc".into(), created_date_utc);
+
+        DataFrame::new(vec![
+            Column::new("deal_id".into(), deal_id),
+            Column::new("deal_reference".into(), deal_reference),
+            Column::new("direction".into(), direction),
+            Column::new("size".into(), size),
+            Column::new("level".into(), level),
+            Column::new("limit_level".into(), limit_level),
+            Column::new("stop_level".into(), stop_level),
+            Column::new("controlled_risk".into(), controlled_risk),
+            Column::new("contract_size".into(), contract_size),
+            Column::new("created_date".into(), created_date),
+            created_date_utc_series.into(),
+            Column::new("trailing_step".into(), trailing_step),
+            Column::new("trailing_stop_distance".into(), trailing_stop_distance),
+            Column::new("market_epic".into(), market_epic),
+            Column::new("market_bid".into(), market_bid),
+            Column::new("market_offer".into(), market_offer),
+            Column::new("market_status".into(), market_status),
+        ])
+        .map_err(|e| crate::Error::Config(format!("polars conversion failed: {e}")))
+    }
+}
+
+#[cfg(feature = "polars")]
+fn market_status_str(s: crate::models::common::MarketStatus) -> &'static str {
+    use crate::models::common::MarketStatus;
+    match s {
+        MarketStatus::Tradeable => "TRADEABLE",
+        MarketStatus::EditsOnly => "EDITS_ONLY",
+        MarketStatus::Closed => "CLOSED",
+        MarketStatus::Offline => "OFFLINE",
+        MarketStatus::OnAuction => "ON_AUCTION",
+        MarketStatus::OnAuctionNoEdits => "ON_AUCTION_NO_EDITS",
+        MarketStatus::Suspended => "SUSPENDED",
+        MarketStatus::Unknown => "UNKNOWN",
+    }
+}

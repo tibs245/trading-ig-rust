@@ -130,3 +130,72 @@ impl UpdatePreferences {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Polars conversion
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "polars")]
+impl crate::dataframe::IntoDataFrame for Vec<Account> {
+    /// Convert a list of accounts into a `polars::prelude::DataFrame`.
+    ///
+    /// Column layout:
+    ///
+    /// | column              | dtype    | nullable |
+    /// | ------------------- | -------- | -------- |
+    /// | `account_id`        | `Utf8`   | no       |
+    /// | `account_alias`     | `Utf8`   | yes      |
+    /// | `account_type`      | `Utf8`   | no       |
+    /// | `account_name`      | `Utf8`   | no       |
+    /// | `can_transfer_to_ma`| `Boolean`| yes      |
+    /// | `can_transfer_from_ma`| `Boolean`| yes    |
+    /// | `default_account`   | `Boolean`| no       |
+    /// | `preferred`         | `Boolean`| no       |
+    /// | `balance`           | `Float64`| yes      |
+    /// | `deposit`           | `Float64`| yes      |
+    /// | `profit_loss`       | `Float64`| yes      |
+    /// | `available_cash`    | `Float64`| yes      |
+    fn to_dataframe(&self) -> crate::Result<polars::prelude::DataFrame> {
+        use polars::prelude::*;
+
+        let account_id: Vec<&str> = self.iter().map(|a| a.account_id.as_str()).collect();
+        let account_alias: Vec<Option<&str>> =
+            self.iter().map(|a| a.account_alias.as_deref()).collect();
+        let account_type: Vec<&str> = self
+            .iter()
+            .map(|a| match a.account_type {
+                AccountType::Cfd => "CFD",
+                AccountType::Physical => "PHYSICAL",
+                AccountType::Spreadbet => "SPREADBET",
+            })
+            .collect();
+        let account_name: Vec<&str> = self.iter().map(|a| a.account_name.as_str()).collect();
+        let can_transfer_to_ma: Vec<Option<bool>> =
+            self.iter().map(|a| a.can_transfer_to_ma).collect();
+        let can_transfer_from_ma: Vec<Option<bool>> =
+            self.iter().map(|a| a.can_transfer_from_ma).collect();
+        let default_account: Vec<bool> = self.iter().map(|a| a.default_account).collect();
+        let preferred: Vec<bool> = self.iter().map(|a| a.preferred).collect();
+        let balance: Vec<Option<f64>> = self.iter().map(|a| a.balance.balance).collect();
+        let deposit: Vec<Option<f64>> = self.iter().map(|a| a.balance.deposit).collect();
+        let profit_loss: Vec<Option<f64>> = self.iter().map(|a| a.balance.profit_loss).collect();
+        let available_cash: Vec<Option<f64>> =
+            self.iter().map(|a| a.balance.available_cash).collect();
+
+        DataFrame::new(vec![
+            Column::new("account_id".into(), account_id),
+            Column::new("account_alias".into(), account_alias),
+            Column::new("account_type".into(), account_type),
+            Column::new("account_name".into(), account_name),
+            Column::new("can_transfer_to_ma".into(), can_transfer_to_ma),
+            Column::new("can_transfer_from_ma".into(), can_transfer_from_ma),
+            Column::new("default_account".into(), default_account),
+            Column::new("preferred".into(), preferred),
+            Column::new("balance".into(), balance),
+            Column::new("deposit".into(), deposit),
+            Column::new("profit_loss".into(), profit_loss),
+            Column::new("available_cash".into(), available_cash),
+        ])
+        .map_err(|e| crate::Error::Config(format!("polars conversion failed: {e}")))
+    }
+}

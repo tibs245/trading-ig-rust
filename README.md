@@ -67,8 +67,38 @@ IG_API_KEY=xxx IG_USERNAME=you IG_PASSWORD=secret \
 | `native-tls`   | no      | TLS via system OpenSSL                                   |
 | `stream`       | no      | Lightstreamer streaming client                           |
 | `encryption`   | no      | Encrypted-password login (RSA)                           |
+| `polars`       | no      | Conversions from tabular API responses to `DataFrame`    |
 | `live`         | no      | Compile the live integration test suite (read-only path) |
 | `live-trading` | no      | Also compile write/mutation live tests (implies `live`)  |
+
+### `polars` feature
+
+Enable the `polars` feature to convert tabular API responses directly into
+[Polars](https://docs.rs/polars) `DataFrame`s for analysis:
+
+```toml
+[dependencies]
+trading-ig = { version = "0.1", features = ["polars"] }
+```
+
+```rust
+use trading_ig::dataframe::IntoDataFrame;
+
+// Convert a list of open positions into a DataFrame.
+let positions = client.dealing().positions().list_v2().await?;
+let df = positions.to_dataframe()?;
+println!("{df}");
+
+// Convert historical prices into a DataFrame (one row per bar).
+let prices = client.prices().history_v3(&epic, Default::default()).await?;
+let df = prices.to_dataframe()?;
+println!("{df}");
+```
+
+The `IntoDataFrame` trait is implemented on `Vec<Account>`,
+`Vec<PositionV2>`, `Vec<WorkingOrderV2>`, `HistoricalPrices`,
+`Vec<Activity>`, `Vec<Transaction>`, `Vec<MarketSummary>`, and
+`Vec<Sentiment>`.
 
 ## Live integration tests
 
