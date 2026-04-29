@@ -21,6 +21,9 @@ pub mod operations;
 pub mod prices;
 pub mod repeat_dealing;
 pub mod session;
+#[cfg(feature = "stream")]
+#[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
+pub mod streaming;
 pub mod time;
 pub mod watchlists;
 

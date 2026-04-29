@@ -33,6 +33,8 @@ use crate::operations::OperationsApi;
 use crate::prices::PricesApi;
 use crate::repeat_dealing::RepeatDealingApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
+#[cfg(feature = "stream")]
+use crate::streaming::client::StreamingApi;
 use crate::watchlists::WatchlistsApi;
 
 use http::Transport;
@@ -111,5 +113,15 @@ impl IgClient {
     /// Watchlists API: list, create, delete watchlists; add/remove markets.
     pub fn watchlists(&self) -> WatchlistsApi<'_> {
         WatchlistsApi { client: self }
+    }
+
+    /// Streaming API: connect to the Lightstreamer endpoint and subscribe to
+    /// live market, chart, account, and trade updates.
+    ///
+    /// Requires the `stream` feature.
+    #[cfg(feature = "stream")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
+    pub fn streaming(&self) -> StreamingApi<'_> {
+        StreamingApi { client: self }
     }
 }
