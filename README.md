@@ -61,12 +61,53 @@ IG_API_KEY=xxx IG_USERNAME=you IG_PASSWORD=secret \
 
 ## Cargo features
 
-| feature       | default | description                              |
-| ------------- | ------- | ---------------------------------------- |
-| `rustls-tls`  | yes     | TLS via `rustls`                         |
-| `native-tls`  | no      | TLS via system OpenSSL                   |
-| `stream`      | no      | Lightstreamer streaming client           |
-| `encryption`  | no      | Encrypted-password login (RSA)           |
+| feature       | default | description                                          |
+| ------------- | ------- | ---------------------------------------------------- |
+| `rustls-tls`  | yes     | TLS via `rustls`                                     |
+| `native-tls`  | no      | TLS via system OpenSSL                               |
+| `stream`      | no      | Lightstreamer streaming client                       |
+| `encryption`  | no      | Encrypted-password login (RSA)                       |
+| `polars`      | no      | Conversions from tabular API responses to `DataFrame`|
+
+### `polars` feature
+
+Enable the `polars` feature to convert tabular API responses directly into
+[Polars](https://docs.rs/polars) `DataFrame`s for analysis:
+
+```toml
+[dependencies]
+trading-ig = { version = "0.1", features = ["polars"] }
+```
+
+```rust
+use trading_ig::dataframe::IntoDataFrame;
+
+// Convert a list of open positions into a DataFrame.
+let positions = client.dealing().positions().list_v2().await?;
+let df = positions.to_dataframe()?;
+println!("{df}");
+
+// Convert historical prices into a DataFrame (one row per bar).
+let prices = client.prices().history_v3(&epic, Default::default()).await?;
+let df = prices.to_dataframe()?;
+// df columns: snapshot_time, snapshot_time_utc, open_bid, open_ask,
+//             high_bid, high_ask, low_bid, low_ask, close_bid, close_ask,
+//             last_traded_volume
+println!("{df}");
+```
+
+The `IntoDataFrame` trait is implemented on:
+
+| Type                  | Source                     |
+| --------------------- | -------------------------- |
+| `Vec<Account>`        | `client.accounts().list()` |
+| `Vec<PositionV2>`     | `client.dealing().positions().list_v2()` |
+| `Vec<WorkingOrderV2>` | `client.dealing().working_orders().list_v2()` |
+| `HistoricalPrices`    | `client.prices().history_v3(…)` |
+| `Vec<Activity>`       | `client.history().activity_v3(…)` |
+| `Vec<Transaction>`    | `client.history().transactions_v2(…).transactions` |
+| `Vec<MarketSummary>`  | `client.markets().search(…)` / watchlists |
+| `Vec<Sentiment>`      | `client.client_sentiment().get_many(…)` |
 
 ## Project knowledge
 

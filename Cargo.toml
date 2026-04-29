@@ -16,6 +16,7 @@ rustls-tls = ["reqwest/rustls-tls"]
 native-tls = ["reqwest/native-tls"]
 stream = []
 encryption = ["dep:rsa", "dep:base64"]
+polars = ["dep:polars"]
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "http2"] }
@@ -32,6 +33,7 @@ http = "1"
 bytes = "1"
 rsa = { version = "0.9", optional = true }
 base64 = { version = "0.22", optional = true }
+polars = { version = "0.46", optional = true, default-features = false, features = ["lazy", "dtype-datetime"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

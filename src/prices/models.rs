@@ -161,3 +161,67 @@ pub struct HistoricalPrices {
     /// Pagination and allowance metadata.
     pub metadata: PricesMetadata,
 }
+
+// ---------------------------------------------------------------------------
+// Polars conversion
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "polars")]
+impl crate::dataframe::IntoDataFrame for HistoricalPrices {
+    /// Convert historical prices into a `polars::prelude::DataFrame` with one row per
+    /// [`PricePoint`].
+    ///
+    /// Column layout:
+    ///
+    /// | column                   | dtype      | nullable |
+    /// | ------------------------ | ---------- | -------- |
+    /// | `snapshot_time`          | `Utf8`     | no       |
+    /// | `snapshot_time_utc`      | `Datetime` | no       |
+    /// | `open_bid`               | `Float64`  | yes      |
+    /// | `open_ask`               | `Float64`  | yes      |
+    /// | `high_bid`               | `Float64`  | yes      |
+    /// | `high_ask`               | `Float64`  | yes      |
+    /// | `low_bid`                | `Float64`  | yes      |
+    /// | `low_ask`                | `Float64`  | yes      |
+    /// | `close_bid`              | `Float64`  | yes      |
+    /// | `close_ask`              | `Float64`  | yes      |
+    /// | `last_traded_volume`     | `UInt64`   | yes      |
+    fn to_dataframe(&self) -> crate::Result<polars::prelude::DataFrame> {
+        use polars::prelude::*;
+
+        let snapshot_time: Vec<&str> = self
+            .prices
+            .iter()
+            .map(|p| p.snapshot_time.as_str())
+            .collect();
+        let snapshot_time_utc: Vec<NaiveDateTime> =
+            self.prices.iter().map(|p| p.snapshot_time_utc).collect();
+        let open_bid: Vec<Option<f64>> = self.prices.iter().map(|p| p.open_price.bid).collect();
+        let open_ask: Vec<Option<f64>> = self.prices.iter().map(|p| p.open_price.ask).collect();
+        let high_bid: Vec<Option<f64>> = self.prices.iter().map(|p| p.high_price.bid).collect();
+        let high_ask: Vec<Option<f64>> = self.prices.iter().map(|p| p.high_price.ask).collect();
+        let low_bid: Vec<Option<f64>> = self.prices.iter().map(|p| p.low_price.bid).collect();
+        let low_ask: Vec<Option<f64>> = self.prices.iter().map(|p| p.low_price.ask).collect();
+        let close_bid: Vec<Option<f64>> = self.prices.iter().map(|p| p.close_price.bid).collect();
+        let close_ask: Vec<Option<f64>> = self.prices.iter().map(|p| p.close_price.ask).collect();
+        let last_traded_volume: Vec<Option<u64>> =
+            self.prices.iter().map(|p| p.last_traded_volume).collect();
+
+        let snapshot_time_utc_series = Series::new("snapshot_time_utc".into(), snapshot_time_utc);
+
+        DataFrame::new(vec![
+            Column::new("snapshot_time".into(), snapshot_time),
+            snapshot_time_utc_series.into(),
+            Column::new("open_bid".into(), open_bid),
+            Column::new("open_ask".into(), open_ask),
+            Column::new("high_bid".into(), high_bid),
+            Column::new("high_ask".into(), high_ask),
+            Column::new("low_bid".into(), low_bid),
+            Column::new("low_ask".into(), low_ask),
+            Column::new("close_bid".into(), close_bid),
+            Column::new("close_ask".into(), close_ask),
+            Column::new("last_traded_volume".into(), last_traded_volume),
+        ])
+        .map_err(|e| crate::Error::Config(format!("polars conversion failed: {e}")))
+    }
+}

@@ -12,6 +12,9 @@ pub mod accounts;
 pub mod client;
 pub mod client_sentiment;
 pub mod config;
+#[cfg(feature = "polars")]
+#[cfg_attr(docsrs, doc(cfg(feature = "polars")))]
+pub mod dataframe;
 pub mod dealing;
 pub mod error;
 pub mod history;

@@ -204,3 +204,140 @@ where
             .map_err(serde::de::Error::custom),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Polars conversion
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "polars")]
+impl crate::dataframe::IntoDataFrame for Vec<WorkingOrderV2> {
+    /// Convert a list of v2 working orders into a `polars::prelude::DataFrame`.
+    ///
+    /// Column layout:
+    ///
+    /// | column               | dtype     | nullable |
+    /// | -------------------- | --------- | -------- |
+    /// | `deal_id`            | `Utf8`    | no       |
+    /// | `epic`               | `Utf8`    | no       |
+    /// | `direction`          | `Utf8`    | no       |
+    /// | `order_size`         | `Float64` | no       |
+    /// | `order_level`        | `Float64` | no       |
+    /// | `order_type`         | `Utf8`    | no       |
+    /// | `time_in_force`      | `Utf8`    | no       |
+    /// | `guaranteed_stop`    | `Boolean` | no       |
+    /// | `currency_code`      | `Utf8`    | yes      |
+    /// | `dma`                | `Boolean` | yes      |
+    /// | `good_till_date`     | `Utf8`    | yes      |
+    /// | `limit_distance`     | `Float64` | yes      |
+    /// | `limit_level`        | `Float64` | yes      |
+    /// | `stop_distance`      | `Float64` | yes      |
+    /// | `stop_level`         | `Float64` | yes      |
+    /// | `market_bid`         | `Float64` | yes      |
+    /// | `market_offer`       | `Float64` | yes      |
+    /// | `market_status`      | `Utf8`    | no       |
+    fn to_dataframe(&self) -> crate::Result<polars::prelude::DataFrame> {
+        use polars::prelude::*;
+
+        let deal_id: Vec<&str> = self.iter().map(|w| w.order_data.deal_id.as_str()).collect();
+        let epic: Vec<&str> = self.iter().map(|w| w.order_data.epic.as_str()).collect();
+        let direction: Vec<&str> = self
+            .iter()
+            .map(|w| match w.order_data.direction {
+                crate::models::common::Direction::Buy => "BUY",
+                crate::models::common::Direction::Sell => "SELL",
+            })
+            .collect();
+        let order_size: Vec<f64> = self.iter().map(|w| w.order_data.order_size).collect();
+        let order_level: Vec<f64> = self.iter().map(|w| w.order_data.order_level).collect();
+        let order_type: Vec<&str> = self
+            .iter()
+            .map(|w| order_type_str(w.order_data.order_type))
+            .collect();
+        let time_in_force: Vec<&str> = self
+            .iter()
+            .map(|w| time_in_force_str(w.order_data.time_in_force))
+            .collect();
+        let guaranteed_stop: Vec<bool> =
+            self.iter().map(|w| w.order_data.guaranteed_stop).collect();
+        let currency_code: Vec<Option<&str>> = self
+            .iter()
+            .map(|w| w.order_data.currency_code.as_ref().map(Currency::as_str))
+            .collect();
+        let dma: Vec<Option<bool>> = self.iter().map(|w| w.order_data.dma).collect();
+        let good_till_date: Vec<Option<&str>> = self
+            .iter()
+            .map(|w| w.order_data.good_till_date.as_deref())
+            .collect();
+        let limit_distance: Vec<Option<f64>> =
+            self.iter().map(|w| w.order_data.limit_distance).collect();
+        let limit_level: Vec<Option<f64>> = self.iter().map(|w| w.order_data.limit_level).collect();
+        let stop_distance: Vec<Option<f64>> =
+            self.iter().map(|w| w.order_data.stop_distance).collect();
+        let stop_level: Vec<Option<f64>> = self.iter().map(|w| w.order_data.stop_level).collect();
+        let market_bid: Vec<Option<f64>> = self.iter().map(|w| w.market.bid).collect();
+        let market_offer: Vec<Option<f64>> = self.iter().map(|w| w.market.offer).collect();
+        let market_status: Vec<&str> = self
+            .iter()
+            .map(|w| market_status_str(w.market.market_status))
+            .collect();
+
+        DataFrame::new(vec![
+            Column::new("deal_id".into(), deal_id),
+            Column::new("epic".into(), epic),
+            Column::new("direction".into(), direction),
+            Column::new("order_size".into(), order_size),
+            Column::new("order_level".into(), order_level),
+            Column::new("order_type".into(), order_type),
+            Column::new("time_in_force".into(), time_in_force),
+            Column::new("guaranteed_stop".into(), guaranteed_stop),
+            Column::new("currency_code".into(), currency_code),
+            Column::new("dma".into(), dma),
+            Column::new("good_till_date".into(), good_till_date),
+            Column::new("limit_distance".into(), limit_distance),
+            Column::new("limit_level".into(), limit_level),
+            Column::new("stop_distance".into(), stop_distance),
+            Column::new("stop_level".into(), stop_level),
+            Column::new("market_bid".into(), market_bid),
+            Column::new("market_offer".into(), market_offer),
+            Column::new("market_status".into(), market_status),
+        ])
+        .map_err(|e| crate::Error::Config(format!("polars conversion failed: {e}")))
+    }
+}
+
+#[cfg(feature = "polars")]
+fn order_type_str(t: crate::models::common::OrderType) -> &'static str {
+    use crate::models::common::OrderType;
+    match t {
+        OrderType::Limit => "LIMIT",
+        OrderType::Market => "MARKET",
+        OrderType::Quote => "QUOTE",
+        OrderType::Stop => "STOP",
+    }
+}
+
+#[cfg(feature = "polars")]
+fn time_in_force_str(t: crate::models::common::TimeInForce) -> &'static str {
+    use crate::models::common::TimeInForce;
+    match t {
+        TimeInForce::GoodTillCancelled => "GOOD_TILL_CANCELLED",
+        TimeInForce::GoodTillDate => "GOOD_TILL_DATE",
+        TimeInForce::ExecuteAndEliminate => "EXECUTE_AND_ELIMINATE",
+        TimeInForce::FillOrKill => "FILL_OR_KILL",
+    }
+}
+
+#[cfg(feature = "polars")]
+fn market_status_str(s: crate::models::common::MarketStatus) -> &'static str {
+    use crate::models::common::MarketStatus;
+    match s {
+        MarketStatus::Tradeable => "TRADEABLE",
+        MarketStatus::EditsOnly => "EDITS_ONLY",
+        MarketStatus::Closed => "CLOSED",
+        MarketStatus::Offline => "OFFLINE",
+        MarketStatus::OnAuction => "ON_AUCTION",
+        MarketStatus::OnAuctionNoEdits => "ON_AUCTION_NO_EDITS",
+        MarketStatus::Suspended => "SUSPENDED",
+        MarketStatus::Unknown => "UNKNOWN",
+    }
+}
