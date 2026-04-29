@@ -23,6 +23,7 @@ pub use builder::IgClientBuilder;
 
 use std::sync::Arc;
 
+use crate::accounts::AccountsApi;
 use crate::config::IgConfig;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
@@ -57,5 +58,10 @@ impl IgClient {
                 credentials: self.credentials.clone(),
             },
         }
+    }
+
+    /// Accounts API: list accounts and manage preferences.
+    pub fn accounts(&self) -> AccountsApi<'_> {
+        AccountsApi { client: self }
     }
 }

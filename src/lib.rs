@@ -8,6 +8,7 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+pub mod accounts;
 pub mod client;
 pub mod config;
 pub mod error;

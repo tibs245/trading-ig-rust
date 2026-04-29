@@ -1,0 +1,36 @@
+{
+  "accounts": [
+    {
+      "accountId": "ABC123",
+      "accountAlias": "My CFD Account",
+      "accountType": "CFD",
+      "accountName": "Demo CFD",
+      "canTransferToMA": true,
+      "canTransferFromMA": false,
+      "defaultAccount": true,
+      "preferred": true,
+      "balance": {
+        "balance": 10000.0,
+        "deposit": 500.0,
+        "profitLoss": 125.5,
+        "availableCash": 9500.0
+      }
+    },
+    {
+      "accountId": "DEF456",
+      "accountAlias": null,
+      "accountType": "SPREADBET",
+      "accountName": "Demo Spreadbet",
+      "canTransferToMA": false,
+      "canTransferFromMA": false,
+      "defaultAccount": false,
+      "preferred": false,
+      "balance": {
+        "balance": 5000.0,
+        "deposit": 0.0,
+        "profitLoss": -50.0,
+        "availableCash": 5000.0
+      }
+    }
+  ]
+}
