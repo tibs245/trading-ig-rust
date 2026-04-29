@@ -1,0 +1,23 @@
+{
+  "markets": [
+    {
+      "epic": "CS.D.EURUSD.TODAY.IP",
+      "instrumentName": "EUR/USD",
+      "instrumentType": "CURRENCIES",
+      "expiry": "DFB",
+      "high": 1.1250,
+      "low": 1.1180,
+      "percentageChange": 0.12,
+      "netChange": 0.0013,
+      "bid": 1.1220,
+      "offer": 1.1222,
+      "updateTime": "14:30:00",
+      "updateTimeUTC": "14:30:00",
+      "delayTime": 0,
+      "streamingPricesAvailable": true,
+      "marketStatus": "TRADEABLE",
+      "scalingFactor": 1
+    }
+  ],
+  "nodes": null
+}

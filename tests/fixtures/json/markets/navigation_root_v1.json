@@ -1,0 +1,9 @@
+{
+  "markets": null,
+  "nodes": [
+    { "id": "668394", "name": "Forex" },
+    { "id": "77976799", "name": "Indices" },
+    { "id": "77976802", "name": "Shares" },
+    { "id": "97599", "name": "Commodities" }
+  ]
+}

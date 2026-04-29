@@ -24,6 +24,7 @@ pub use builder::IgClientBuilder;
 use std::sync::Arc;
 
 use crate::config::IgConfig;
+use crate::markets::MarketsApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
 use http::Transport;
@@ -57,5 +58,10 @@ impl IgClient {
                 credentials: self.credentials.clone(),
             },
         }
+    }
+
+    /// Markets API: search, fetch, and navigate IG market instruments.
+    pub fn markets(&self) -> MarketsApi<'_> {
+        MarketsApi { client: self }
     }
 }

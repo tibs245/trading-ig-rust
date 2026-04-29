@@ -1,0 +1,62 @@
+{
+  "instrument": {
+    "epic": "CS.D.GBPUSD.TODAY.IP",
+    "name": "GBP/USD",
+    "status": "TRADEABLE",
+    "type": "CURRENCIES",
+    "expiry": "DFB",
+    "lotSize": 1.0,
+    "unit": "AMOUNT",
+    "high": 1.2720,
+    "low": 1.2650,
+    "percentageChange": 0.08,
+    "netChange": 0.0010,
+    "bid": 1.2700,
+    "offer": 1.2702,
+    "updateTime": "15:00:00",
+    "updateTimeUTC": "15:00:00",
+    "delayTime": 0,
+    "streamingPricesAvailable": true,
+    "marketStatus": "TRADEABLE",
+    "scalingFactor": 1,
+    "currencies": [
+      { "code": "USD", "name": "US Dollar", "symbol": "$", "isDefault": true },
+      { "code": "GBP", "name": "Pound Sterling", "symbol": "£", "isDefault": false }
+    ],
+    "rolloverDetails": null,
+    "sprintMarketsMinimumExpiryTime": null,
+    "sprintMarketsMaximumExpiryTime": null,
+    "marginFactor": 0.05,
+    "marginFactorUnit": "PERCENTAGE",
+    "slippageFactor": { "unit": "pct", "value": 50.0 },
+    "limitedRiskPremium": { "unit": "POINTS", "value": 0.8 },
+    "openingHours": null,
+    "expiryDetails": null,
+    "specialInfo": []
+  },
+  "dealingRules": {
+    "minStepDistance": { "unit": "POINTS", "value": 1.0 },
+    "minDealSize": { "unit": "AMOUNT", "value": 0.5 },
+    "minControlledRiskStopDistance": { "unit": "POINTS", "value": 20.0 },
+    "minNormalStopOrLimitDistance": { "unit": "POINTS", "value": 0.0 },
+    "maxStopOrLimitDistance": { "unit": "PERCENTAGE", "value": 75.0 },
+    "controlledRiskSpacing": { "unit": "POINTS", "value": 0.8 },
+    "marketOrderPreference": "AVAILABLE_DEFAULT_ON",
+    "trailingStopsPreference": "AVAILABLE"
+  },
+  "snapshot": {
+    "marketStatus": "TRADEABLE",
+    "netChange": 0.0010,
+    "percentageChange": 0.08,
+    "updateTime": "15:00:00",
+    "delayTime": 0,
+    "bid": 1.2700,
+    "offer": 1.2702,
+    "high": 1.2720,
+    "low": 1.2650,
+    "binaryOdds": null,
+    "decimalPlacesFactor": 4,
+    "scalingFactor": 1,
+    "controlledRiskExtraSpread": 0.8
+  }
+}

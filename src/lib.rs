@@ -11,6 +11,7 @@
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod markets;
 pub mod models;
 pub mod session;
 pub mod time;
