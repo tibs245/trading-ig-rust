@@ -1,0 +1,18 @@
+{
+  "transactions": [
+    {
+      "date": "15/01/24 10:00",
+      "dateUtc": "2024-01-15T10:00:00",
+      "instrumentName": "GBP/USD",
+      "period": "DFB",
+      "profitAndLoss": "EUR99.00",
+      "transactionType": "TRADE",
+      "reference": "DEAL003",
+      "openLevel": "1.27000",
+      "closeLevel": "1.27990",
+      "size": "2",
+      "currency": "GBP",
+      "cashTransaction": false
+    }
+  ]
+}

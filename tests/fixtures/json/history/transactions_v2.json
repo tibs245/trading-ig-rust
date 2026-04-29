@@ -1,0 +1,39 @@
+{
+  "transactions": [
+    {
+      "date": "15/01/24 10:00",
+      "dateUtc": "2024-01-15T10:00:00",
+      "instrumentName": "GBP/USD",
+      "period": "DFB",
+      "profitAndLoss": "EUR123.45",
+      "transactionType": "TRADE",
+      "reference": "DEAL001",
+      "openLevel": "1.27000",
+      "closeLevel": "1.27500",
+      "size": "1",
+      "currency": "GBP",
+      "cashTransaction": false
+    },
+    {
+      "date": "14/01/24 09:30",
+      "dateUtc": "2024-01-14T09:30:00",
+      "instrumentName": "EUR/USD",
+      "period": "DFB",
+      "profitAndLoss": "EUR-56.78",
+      "transactionType": "TRADE",
+      "reference": "DEAL002",
+      "openLevel": "1.09000",
+      "closeLevel": "1.08500",
+      "size": "-1",
+      "currency": "EUR",
+      "cashTransaction": false
+    }
+  ],
+  "metadata": {
+    "pageData": {
+      "pageNumber": 1,
+      "pageSize": 20,
+      "totalPages": 1
+    }
+  }
+}

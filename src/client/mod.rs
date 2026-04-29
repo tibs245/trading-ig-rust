@@ -24,6 +24,7 @@ pub use builder::IgClientBuilder;
 use std::sync::Arc;
 
 use crate::config::IgConfig;
+use crate::history::HistoryApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
 use http::Transport;
@@ -57,5 +58,10 @@ impl IgClient {
                 credentials: self.credentials.clone(),
             },
         }
+    }
+
+    /// History API: activity (v1 + v3) and transactions (v1 + v2).
+    pub fn history(&self) -> HistoryApi<'_> {
+        HistoryApi { client: self }
     }
 }
