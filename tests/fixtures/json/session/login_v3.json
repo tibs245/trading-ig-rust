@@ -1,0 +1,14 @@
+{
+  "accountId": "ABC123",
+  "clientId": "999999",
+  "timezoneOffset": 0,
+  "lightstreamerEndpoint": "https://demo-apd.marketdatasystems.com",
+  "currencyIsoCode": "EUR",
+  "locale": "fr_FR",
+  "oauthToken": {
+    "access_token": "demo-access-token",
+    "refresh_token": "demo-refresh-token",
+    "token_type": "Bearer",
+    "expires_in": "60"
+  }
+}

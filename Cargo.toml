@@ -1,0 +1,54 @@
+[package]
+name = "trading-ig"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Async Rust client for the IG Markets REST and Lightstreamer streaming APIs"
+license = "BSD-3-Clause"
+repository = "https://github.com/ig-python/trading-ig-rust"
+readme = "README.md"
+keywords = ["ig", "trading", "broker", "finance", "cfd"]
+categories = ["api-bindings", "finance"]
+
+[features]
+default = ["rustls-tls"]
+rustls-tls = ["reqwest/rustls-tls"]
+native-tls = ["reqwest/native-tls"]
+stream = []
+encryption = ["dep:rsa", "dep:base64"]
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "http2"] }
+tokio = { version = "1", features = ["sync", "time", "rt", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_repr = "0.1"
+thiserror = "2"
+tracing = "0.1"
+url = "2"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+async-trait = "0.1"
+http = "1"
+bytes = "1"
+rsa = { version = "0.9", optional = true }
+base64 = { version = "0.22", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+wiremock = "0.6"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+pretty_assertions = "1"
+serde_path_to_error = "0.1"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+return_self_not_must_use = "allow"

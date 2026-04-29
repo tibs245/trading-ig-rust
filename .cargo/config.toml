@@ -1,0 +1,4 @@
+# Use Apple Command Line Tools instead of full Xcode for the linker.
+# Avoids the `xcodebuild -license` prompt while keeping compilation working.
+[env]
+DEVELOPER_DIR = "/Library/Developer/CommandLineTools"
