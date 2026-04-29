@@ -5,9 +5,7 @@
 mod support;
 
 use support::mock_server::IgMockServer;
-use trading_ig::dealing::positions::{
-    ClosePositionRequest, DealStatus, UpdatePositionRequest,
-};
+use trading_ig::dealing::positions::{ClosePositionRequest, DealStatus, UpdatePositionRequest};
 use trading_ig::models::common::{DealId, DealReference, Direction, Epic, OrderType};
 
 // ---------------------------------------------------------------------------
@@ -37,7 +35,10 @@ async fn list_v1_golden_path() {
     assert_eq!(p.deal_reference.as_str(), "ref-v1-001");
     assert_eq!(p.direction, Direction::Buy);
     assert!((p.size - 1.0).abs() < f64::EPSILON);
-    assert_eq!(p.market.epic.as_ref().map(trading_ig::models::Epic::as_str), Some("CS.D.GBPUSD.TODAY.IP"));
+    assert_eq!(
+        p.market.epic.as_ref().map(trading_ig::models::Epic::as_str),
+        Some("CS.D.GBPUSD.TODAY.IP")
+    );
     assert_eq!(p.market.expiry.as_deref(), Some("DFB"));
 }
 
@@ -154,8 +155,13 @@ async fn list_v2_empty_returns_empty_vec() {
 async fn list_v2_api_error_surfaces_error_code() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_error("GET", "positions", 401, "error.public-api.failure.client-token-invalid")
-        .await;
+    mock.mount_error(
+        "GET",
+        "positions",
+        401,
+        "error.public-api.failure.client-token-invalid",
+    )
+    .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -286,10 +292,7 @@ async fn confirm_rejected_deal_returns_rejected_status() {
         .expect("confirm returns (even for rejected)");
 
     assert_eq!(confirmation.deal_status, DealStatus::Rejected);
-    assert_eq!(
-        confirmation.reason.as_deref(),
-        Some("INSUFFICIENT_FUNDS")
-    );
+    assert_eq!(confirmation.reason.as_deref(), Some("INSUFFICIENT_FUNDS"));
 }
 
 #[tokio::test]
@@ -544,7 +547,10 @@ async fn update_position_api_error() {
     match err {
         trading_ig::Error::Api { status, source } => {
             assert_eq!(status.as_u16(), 400);
-            assert_eq!(source.error_code, "error.public-api.failure.deal.unknown.deal");
+            assert_eq!(
+                source.error_code,
+                "error.public-api.failure.deal.unknown.deal"
+            );
         }
         other => panic!("expected Error::Api, got {other:?}"),
     }
@@ -598,8 +604,13 @@ async fn close_position_golden_path() {
 async fn close_position_api_error() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_error("DELETE", "positions/otc", 400, "error.public-api.failure.position.unknown")
-        .await;
+    mock.mount_error(
+        "DELETE",
+        "positions/otc",
+        400,
+        "error.public-api.failure.position.unknown",
+    )
+    .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -626,7 +637,10 @@ async fn close_position_api_error() {
     match err {
         trading_ig::Error::Api { status, source } => {
             assert_eq!(status.as_u16(), 400);
-            assert_eq!(source.error_code, "error.public-api.failure.position.unknown");
+            assert_eq!(
+                source.error_code,
+                "error.public-api.failure.position.unknown"
+            );
         }
         other => panic!("expected Error::Api, got {other:?}"),
     }

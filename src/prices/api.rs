@@ -10,8 +10,8 @@ use crate::Result;
 use crate::models::common::Epic;
 use crate::time::{self, ApiVersion};
 
-use super::models::{HistoricalPrices, HistoricalPricesRequest, Resolution};
 use super::PricesApi;
+use super::models::{HistoricalPrices, HistoricalPricesRequest, Resolution};
 
 impl PricesApi<'_> {
     /// Fetch one page of historical prices using the v3 flexible endpoint.
@@ -34,7 +34,7 @@ impl PricesApi<'_> {
         let result = self.fetch_v3_page(epic, &req).await?;
         info!(
             remaining_allowance = result.metadata.allowance.remaining_allowance,
-            allowance_expiry    = result.metadata.allowance.allowance_expiry,
+            allowance_expiry = result.metadata.allowance.allowance_expiry,
             "prices v3 allowance"
         );
         Ok(result)
@@ -67,7 +67,7 @@ impl PricesApi<'_> {
         let first = self.fetch_v3_page(epic, &first_req).await?;
         info!(
             remaining_allowance = first.metadata.allowance.remaining_allowance,
-            allowance_expiry    = first.metadata.allowance.allowance_expiry,
+            allowance_expiry = first.metadata.allowance.allowance_expiry,
             page = 1,
             "prices v3 allowance"
         );
@@ -92,7 +92,7 @@ impl PricesApi<'_> {
             let page = self.fetch_v3_page(epic, &page_req).await?;
             info!(
                 remaining_allowance = page.metadata.allowance.remaining_allowance,
-                allowance_expiry    = page.metadata.allowance.allowance_expiry,
+                allowance_expiry = page.metadata.allowance.allowance_expiry,
                 page = page_num,
                 "prices v3 allowance"
             );
@@ -137,7 +137,13 @@ impl PricesApi<'_> {
         let path = build_query_path(&format!("prices/{epic}"), &params);
         self.client
             .transport
-            .request(Method::GET, &path, Some(3), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(3),
+                None::<&()>,
+                &self.client.session,
+            )
             .await
     }
 
@@ -159,11 +165,17 @@ impl PricesApi<'_> {
         let result: HistoricalPrices = self
             .client
             .transport
-            .request(Method::GET, &path, Some(2), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(2),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         info!(
             remaining_allowance = result.metadata.allowance.remaining_allowance,
-            allowance_expiry    = result.metadata.allowance.allowance_expiry,
+            allowance_expiry = result.metadata.allowance.allowance_expiry,
             "prices v2 (num-points) allowance"
         );
         Ok(result)
@@ -196,11 +208,17 @@ impl PricesApi<'_> {
         let result: HistoricalPrices = self
             .client
             .transport
-            .request(Method::GET, &path, Some(2), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(2),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         info!(
             remaining_allowance = result.metadata.allowance.remaining_allowance,
-            allowance_expiry    = result.metadata.allowance.allowance_expiry,
+            allowance_expiry = result.metadata.allowance.allowance_expiry,
             "prices v2 (date-range) allowance"
         );
         Ok(result)
@@ -226,20 +244,23 @@ impl PricesApi<'_> {
     ) -> Result<HistoricalPrices> {
         let from_s = time::format(from, ApiVersion::V1);
         let to_s = time::format(to, ApiVersion::V1);
-        let params: &[(&str, String)] = &[
-            ("startdate", from_s),
-            ("enddate", to_s),
-        ];
+        let params: &[(&str, String)] = &[("startdate", from_s), ("enddate", to_s)];
         let base = format!("prices/{epic}/{resolution}");
         let path = build_query_path(&base, params);
         let result: HistoricalPrices = self
             .client
             .transport
-            .request(Method::GET, &path, Some(1), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(1),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         info!(
             remaining_allowance = result.metadata.allowance.remaining_allowance,
-            allowance_expiry    = result.metadata.allowance.allowance_expiry,
+            allowance_expiry = result.metadata.allowance.allowance_expiry,
             "prices v1 (date-range) allowance"
         );
         Ok(result)

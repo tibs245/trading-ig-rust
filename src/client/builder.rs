@@ -3,8 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::client::http::Transport;
 use crate::client::IgClient;
+use crate::client::http::Transport;
 use crate::config::{Environment, IgConfig};
 use crate::error::{Error, Result};
 use crate::session::{Credentials, SharedSession};

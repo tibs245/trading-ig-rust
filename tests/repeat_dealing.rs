@@ -8,8 +8,8 @@ use trading_ig::models::Epic;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, ResponseTemplate};
 
-use support::matchers::{HasApiKey, HasVersion};
 use support::fixtures;
+use support::matchers::{HasApiKey, HasVersion};
 
 // ── golden path: all windows ──────────────────────────────────────────────────
 
@@ -17,21 +17,13 @@ use support::fixtures;
 async fn window_returns_all_windows() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get(
-        "repeat-dealing-window",
-        1,
-        "repeat_dealing/window_v1.json",
-    )
-    .await;
+    mock.mount_get("repeat-dealing-window", 1, "repeat_dealing/window_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
 
-    let windows = client
-        .repeat_dealing()
-        .window()
-        .await
-        .expect("window");
+    let windows = client.repeat_dealing().window().await.expect("window");
 
     assert_eq!(windows.len(), 2);
     assert_eq!(windows[0].epic.as_str(), "CS.D.GBPUSD.TODAY.IP");

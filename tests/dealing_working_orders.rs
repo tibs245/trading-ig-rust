@@ -2,14 +2,18 @@
 //!
 //! All tests run against a local wiremock instance — no live IG API is used.
 
-#![allow(clippy::doc_markdown, clippy::float_cmp, clippy::redundant_closure_for_method_calls)]
+#![allow(
+    clippy::doc_markdown,
+    clippy::float_cmp,
+    clippy::redundant_closure_for_method_calls
+)]
 
 mod support;
 
 use support::fixtures;
 use support::matchers::{HasApiKey, HasVersion};
-use trading_ig::dealing::working_orders::models::UpdateWorkingOrderRequest;
 use trading_ig::dealing::DealStatus;
+use trading_ig::dealing::working_orders::models::UpdateWorkingOrderRequest;
 use trading_ig::models::common::{Currency, DealId, Direction, Epic, OrderType, TimeInForce};
 use trading_ig::{Credentials, Environment, IgClient};
 use url::Url;
@@ -112,7 +116,13 @@ async fn mount_delete(server: &MockServer, path_str: &str, version: u8, fixture:
 }
 
 /// Mount an IG-style error response.
-async fn mount_error(server: &MockServer, http_method: &str, path_str: &str, status: u16, error_code: &str) {
+async fn mount_error(
+    server: &MockServer,
+    http_method: &str,
+    path_str: &str,
+    status: u16,
+    error_code: &str,
+) {
     Mock::given(method(http_method))
         .and(path(path_str))
         .and(HasApiKey)
@@ -156,7 +166,10 @@ async fn list_v1_golden_path() {
     assert_eq!(o.order_data.order_type, OrderType::Limit);
     assert_eq!(o.order_data.order_size, 1.0);
     assert_eq!(o.order_data.order_level, 1.2345);
-    assert_eq!(o.market.epic.as_ref().map(|e| e.as_str()), Some("CS.D.GBPUSD.TODAY.IP"));
+    assert_eq!(
+        o.market.epic.as_ref().map(|e| e.as_str()),
+        Some("CS.D.GBPUSD.TODAY.IP")
+    );
     assert_eq!(o.market.instrument_name.as_deref(), Some("GBP/USD"));
 }
 
@@ -223,7 +236,10 @@ async fn list_v2_golden_path() {
     assert_eq!(o.order_data.order_type, OrderType::Limit);
     assert_eq!(o.order_data.order_size, 2.5);
     assert!(!o.order_data.guaranteed_stop);
-    assert_eq!(o.market.epic.as_ref().map(|e| e.as_str()), Some("CS.D.EURUSD.TODAY.IP"));
+    assert_eq!(
+        o.market.epic.as_ref().map(|e| e.as_str()),
+        Some("CS.D.EURUSD.TODAY.IP")
+    );
 }
 
 /// list_v2 returns an empty vec when the envelope contains no orders.

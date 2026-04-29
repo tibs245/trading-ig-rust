@@ -95,7 +95,11 @@ pub(super) struct UpdatePreferencesWire<'a> {
 impl UpdatePreferences {
     pub(super) fn to_wire(&self) -> UpdatePreferencesWire<'_> {
         UpdatePreferencesWire {
-            trailing_stops_enabled: if self.trailing_stops_enabled { "true" } else { "false" },
+            trailing_stops_enabled: if self.trailing_stops_enabled {
+                "true"
+            } else {
+                "false"
+            },
         }
     }
 }

@@ -7,12 +7,12 @@ pub mod api;
 pub mod create_working_order;
 pub mod models;
 
-pub use models::{
-    UpdateWorkingOrderRequest, WorkingOrderDataV1,
-    WorkingOrderDataV2, WorkingOrderV1, WorkingOrderV2,
-};
 pub use crate::dealing::common::{DealConfirmation, DealStatus};
 pub use crate::models::common::MarketSnapshot;
+pub use models::{
+    UpdateWorkingOrderRequest, WorkingOrderDataV1, WorkingOrderDataV2, WorkingOrderV1,
+    WorkingOrderV2,
+};
 
 use crate::IgClient;
 

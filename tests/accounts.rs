@@ -103,12 +103,8 @@ async fn list_accounts_api_error_is_surfaced() {
 async fn get_preferences_golden_path() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get(
-        "accounts/preferences",
-        1,
-        "accounts/preferences_v1.json",
-    )
-    .await;
+    mock.mount_get("accounts/preferences", 1, "accounts/preferences_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -146,19 +142,17 @@ async fn update_preferences_golden_path() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
     // IG echoes back the new preferences after a successful update.
-    mock.mount_put(
-        "accounts/preferences",
-        1,
-        "accounts/preferences_v1.json",
-    )
-    .await;
+    mock.mount_put("accounts/preferences", 1, "accounts/preferences_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
 
     let prefs = client
         .accounts()
-        .update_preferences(UpdatePreferences { trailing_stops_enabled: true })
+        .update_preferences(UpdatePreferences {
+            trailing_stops_enabled: true,
+        })
         .await
         .expect("update prefs");
 
@@ -183,7 +177,9 @@ async fn update_preferences_disable_trailing_stops() {
 
     let prefs = client
         .accounts()
-        .update_preferences(UpdatePreferences { trailing_stops_enabled: false })
+        .update_preferences(UpdatePreferences {
+            trailing_stops_enabled: false,
+        })
         .await
         .expect("update prefs");
 

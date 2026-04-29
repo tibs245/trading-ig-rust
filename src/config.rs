@@ -20,10 +20,12 @@ impl Environment {
     /// The canonical REST base URL for this environment.
     pub fn base_url(&self) -> Url {
         match self {
-            Environment::Demo => Url::parse("https://demo-api.ig.com/gateway/deal/")
-                .expect("static URL is valid"),
-            Environment::Live => Url::parse("https://api.ig.com/gateway/deal/")
-                .expect("static URL is valid"),
+            Environment::Demo => {
+                Url::parse("https://demo-api.ig.com/gateway/deal/").expect("static URL is valid")
+            }
+            Environment::Live => {
+                Url::parse("https://api.ig.com/gateway/deal/").expect("static URL is valid")
+            }
             Environment::Custom(u) => {
                 let mut u = u.clone();
                 // Ensure trailing slash so `Url::join` behaves correctly.

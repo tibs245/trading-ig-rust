@@ -6,8 +6,8 @@ use tracing::instrument;
 use crate::client::IgClient;
 use crate::dealing::common::DealConfirmation;
 use crate::dealing::positions::models::{
-    ClosePositionRequest, ClosePositionResponse, PositionV1, PositionV2,
-    PositionsEnvelopeV1, PositionsEnvelopeV2, UpdatePositionRequest, UpdatePositionResponse,
+    ClosePositionRequest, ClosePositionResponse, PositionV1, PositionV2, PositionsEnvelopeV1,
+    PositionsEnvelopeV2, UpdatePositionRequest, UpdatePositionResponse,
 };
 use crate::dealing::positions::open_position::{Missing, OpenPositionBuilder};
 use crate::error::Result;
@@ -82,20 +82,23 @@ impl<'a> PositionsApi<'a> {
         let env: PositionsEnvelopeV2 = self
             .client
             .transport
-            .request(Method::GET, &path, Some(2), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(2),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         // Single-position endpoint wraps in the same envelope shape as the
         // list but with exactly one entry. If the server ever returns zero
         // entries for a direct deal-id lookup we surface that as an API error
         // rather than panicking.
-        env.into_vec()
-            .into_iter()
-            .next()
-            .ok_or_else(|| {
-                crate::error::Error::InvalidInput(
-                    "positions/{dealId} returned an empty positions array".into(),
-                )
-            })
+        env.into_vec().into_iter().next().ok_or_else(|| {
+            crate::error::Error::InvalidInput(
+                "positions/{dealId} returned an empty positions array".into(),
+            )
+        })
     }
 
     // -----------------------------------------------------------------------
@@ -113,16 +116,8 @@ impl<'a> PositionsApi<'a> {
     /// `GET /confirms/{dealReference}`.
     pub fn open(
         &'a self,
-    ) -> OpenPositionBuilder<
-        'a,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-    > {
+    ) -> OpenPositionBuilder<'a, Missing, Missing, Missing, Missing, Missing, Missing, Missing>
+    {
         OpenPositionBuilder::new(self)
     }
 
@@ -145,7 +140,13 @@ impl<'a> PositionsApi<'a> {
         let resp: UpdatePositionResponse = self
             .client
             .transport
-            .request(Method::PUT, &path, Some(2), Some(&req), &self.client.session)
+            .request(
+                Method::PUT,
+                &path,
+                Some(2),
+                Some(&req),
+                &self.client.session,
+            )
             .await?;
         self.confirm(&resp.deal_reference).await
     }

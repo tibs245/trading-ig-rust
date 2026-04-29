@@ -6,4 +6,7 @@
 
 pub mod common;
 
-pub use common::{Currency, DealId, DealReference, Direction, Epic, InstrumentType, MarketSnapshot, MarketStatus, OrderType, TimeInForce};
+pub use common::{
+    Currency, DealId, DealReference, Direction, Epic, InstrumentType, MarketSnapshot, MarketStatus,
+    OrderType, TimeInForce,
+};

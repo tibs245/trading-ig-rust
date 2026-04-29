@@ -36,7 +36,13 @@ impl ClientSentimentApi<'_> {
         let path = format!("clientsentiment/{market_id}");
         self.client
             .transport
-            .request::<(), Sentiment>(Method::GET, &path, Some(1), None::<&()>, &self.client.session)
+            .request::<(), Sentiment>(
+                Method::GET,
+                &path,
+                Some(1),
+                None::<&()>,
+                &self.client.session,
+            )
             .await
     }
 
@@ -51,7 +57,13 @@ impl ClientSentimentApi<'_> {
         let envelope: SentimentEnvelope = self
             .client
             .transport
-            .request(Method::GET, &path, Some(1), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(1),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         Ok(envelope.client_sentiments)
     }
@@ -66,7 +78,13 @@ impl ClientSentimentApi<'_> {
         let envelope: SentimentEnvelope = self
             .client
             .transport
-            .request(Method::GET, &path, Some(1), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(1),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         Ok(envelope.client_sentiments)
     }

@@ -59,9 +59,7 @@ impl SessionApi {
             .ok_or_else(|| Error::Auth("no credentials configured on the client".into()))?;
 
         match creds {
-            Credentials::Password { username, password } => {
-                self.login_v3(username, password).await
-            }
+            Credentials::Password { username, password } => self.login_v3(username, password).await,
         }
     }
 
@@ -138,11 +136,12 @@ impl SessionApi {
 
         let body: LoginResponseV3 = serde_json::from_slice(&resp.body)?;
 
-        let expires_in = body
-            .oauth_token
-            .expires_in
-            .parse::<u64>()
-            .map_err(|e| Error::Auth(format!("invalid expires_in '{}': {e}", body.oauth_token.expires_in)))?;
+        let expires_in = body.oauth_token.expires_in.parse::<u64>().map_err(|e| {
+            Error::Auth(format!(
+                "invalid expires_in '{}': {e}",
+                body.oauth_token.expires_in
+            ))
+        })?;
 
         let tokens = AuthTokens::OAuth {
             access_token: body.oauth_token.access_token,
@@ -189,7 +188,9 @@ impl SessionApi {
                 Method::POST,
                 "session/refresh-token",
                 Some(1),
-                Some(&Req { refresh_token: &refresh_token }),
+                Some(&Req {
+                    refresh_token: &refresh_token,
+                }),
             )
             .await?;
 
@@ -231,4 +232,161 @@ impl SessionApi {
         self.handle.session.replace(SessionState::default()).await;
         Ok(())
     }
+
+    /// Read details about the current session.
+    ///
+    /// When `fetch_tokens` is `true`, the server responds with `CST` and
+    /// `X-SECURITY-TOKEN` headers. These are written into the local session
+    /// state — necessary when an OAuth (v3) session needs CST/XST tokens
+    /// for the Lightstreamer streaming endpoint.
+    #[instrument(skip_all, fields(fetch_tokens = fetch_tokens))]
+    pub async fn read(&self, fetch_tokens: bool) -> Result<SessionDetails> {
+        let path = if fetch_tokens {
+            "session?fetchSessionTokens=true"
+        } else {
+            "session"
+        };
+        let raw = self
+            .handle
+            .transport
+            .request_authenticated_raw::<()>(
+                Method::GET,
+                path,
+                Some(1),
+                None::<&()>,
+                &self.handle.session,
+            )
+            .await?;
+
+        let details: SessionDetails = serde_json::from_slice(&raw.body)?;
+
+        if fetch_tokens {
+            let cst = raw
+                .headers
+                .get("CST")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned);
+            let xst = raw
+                .headers
+                .get("X-SECURITY-TOKEN")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned);
+            if let (Some(cst), Some(x_security_token)) = (cst, xst) {
+                self.handle
+                    .session
+                    .modify(|s| {
+                        // For v3 sessions we keep the OAuth tokens too — but
+                        // some callers (notably Lightstreamer) need CST/XST.
+                        // We replace the token bag entirely; OAuth holders
+                        // who still want refresh capability should call
+                        // `read(false)` only after they're done streaming.
+                        s.tokens = Some(AuthTokens::Cst {
+                            cst,
+                            x_security_token,
+                        });
+                    })
+                    .await;
+            }
+        }
+
+        Ok(details)
+    }
+
+    /// Switch the active trading account.
+    ///
+    /// Updates the local session state so that subsequent v3 requests carry
+    /// the new `IG-ACCOUNT-ID` header.
+    #[instrument(skip_all, fields(account_id = %account_id))]
+    pub async fn switch_account(
+        &self,
+        account_id: &str,
+        default_account: bool,
+    ) -> Result<SwitchAccountResponse> {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Req<'a> {
+            account_id: &'a str,
+            default_account: bool,
+        }
+
+        let resp: SwitchAccountResponse = self
+            .handle
+            .transport
+            .request(
+                Method::PUT,
+                "session",
+                Some(1),
+                Some(&Req {
+                    account_id,
+                    default_account,
+                }),
+                &self.handle.session,
+            )
+            .await?;
+
+        let new_id = account_id.to_owned();
+        self.handle
+            .session
+            .modify(|s| s.account_id = Some(new_id))
+            .await;
+        Ok(resp)
+    }
+
+    /// Fetch the encryption key + timestamp used for encrypted-password login.
+    ///
+    /// Combine with [`crate::session::encryption::encrypt_password`] (behind
+    /// the `encryption` feature) to build the `password` field expected by
+    /// `POST /session` when `encryptedPassword=true`.
+    #[cfg(feature = "encryption")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "encryption")))]
+    #[instrument(skip_all)]
+    pub async fn encryption_key(&self) -> Result<EncryptionKey> {
+        // No Version header for this endpoint.
+        let resp = self
+            .handle
+            .transport
+            .request_unauthenticated::<()>(Method::GET, "session/encryptionKey", None, None)
+            .await?;
+        Ok(serde_json::from_slice(&resp.body)?)
+    }
+}
+
+/// Details returned by `GET /session`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDetails {
+    pub account_id: String,
+    pub client_id: String,
+    pub account_type: Option<String>,
+    pub currency: Option<String>,
+    pub locale: Option<String>,
+    pub timezone_offset: Option<i32>,
+    pub lightstreamer_endpoint: Option<String>,
+}
+
+/// Body returned by `PUT /session` (switch account).
+///
+/// Most useful field is `dealing_enabled`. `has_active_demo_accounts` and
+/// `has_active_live_accounts` are present in some IG responses; modelled
+/// as `Option` for forward compatibility.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SwitchAccountResponse {
+    pub trailing_stops_enabled: bool,
+    pub dealing_enabled: bool,
+    pub has_active_demo_accounts: Option<bool>,
+    pub has_active_live_accounts: Option<bool>,
+}
+
+/// Wire-level response of `GET /session/encryptionKey`.
+#[cfg(feature = "encryption")]
+#[cfg_attr(docsrs, doc(cfg(feature = "encryption")))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptionKey {
+    /// Base64-encoded RSA public key (DER-encoded SPKI).
+    pub encryption_key: String,
+    /// Server-supplied timestamp in milliseconds. Concatenate it to the
+    /// password before encryption: `format!("{password}|{time_stamp}")`.
+    pub time_stamp: i64,
 }

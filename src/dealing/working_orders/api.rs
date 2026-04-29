@@ -4,13 +4,13 @@ use http::Method;
 use serde::Deserialize;
 use tracing::instrument;
 
+use crate::dealing::common::DealConfirmation;
 use crate::dealing::working_orders::create_working_order::{
     CreateWorkingOrderBuilder, Missing, fetch_confirmation,
 };
-use crate::dealing::common::DealConfirmation;
 use crate::dealing::working_orders::models::{
-    UpdateWorkingOrderRequest, WorkingOrderEntryV1Raw, WorkingOrderEntryV2Raw,
-    WorkingOrderV1, WorkingOrderV2,
+    UpdateWorkingOrderRequest, WorkingOrderEntryV1Raw, WorkingOrderEntryV2Raw, WorkingOrderV1,
+    WorkingOrderV2,
 };
 use crate::error::Result;
 use crate::models::common::DealId;
@@ -151,7 +151,13 @@ impl WorkingOrdersApi<'_> {
         let resp: DealReferenceResponse = self
             .client
             .transport
-            .request(Method::PUT, &path, Some(2), Some(&req), &self.client.session)
+            .request(
+                Method::PUT,
+                &path,
+                Some(2),
+                Some(&req),
+                &self.client.session,
+            )
             .await?;
 
         fetch_confirmation(self.client, &resp.deal_reference).await
@@ -171,7 +177,13 @@ impl WorkingOrdersApi<'_> {
         let resp: DealReferenceResponse = self
             .client
             .transport
-            .request::<(), _>(Method::DELETE, &path, Some(2), None::<&()>, &self.client.session)
+            .request::<(), _>(
+                Method::DELETE,
+                &path,
+                Some(2),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
 
         fetch_confirmation(self.client, &resp.deal_reference).await

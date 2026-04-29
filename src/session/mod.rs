@@ -13,9 +13,11 @@ use crate::client::http::Transport;
 use crate::error::{Error, Result};
 
 mod auth;
+#[cfg(feature = "encryption")]
+pub mod encryption;
 mod tokens;
 
-pub use auth::SessionApi;
+pub use auth::{SessionApi, SessionDetails, SwitchAccountResponse};
 pub use tokens::{AuthTokens, SessionState};
 
 /// User-supplied login credentials.
@@ -74,7 +76,9 @@ impl SharedSession {
         if s.tokens.is_some() {
             Ok(s)
         } else {
-            Err(Error::Auth("no active session — call session().login() first".into()))
+            Err(Error::Auth(
+                "no active session — call session().login() first".into(),
+            ))
         }
     }
 }

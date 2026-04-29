@@ -58,8 +58,12 @@ string_newtype! {
 pub struct Currency(pub String);
 
 impl Currency {
-    pub fn new(code: impl Into<String>) -> Self { Self(code.into()) }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn new(code: impl Into<String>) -> Self {
+        Self(code.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for Currency {
@@ -69,15 +73,21 @@ impl fmt::Display for Currency {
 }
 
 impl From<String> for Currency {
-    fn from(s: String) -> Self { Self(s) }
+    fn from(s: String) -> Self {
+        Self(s)
+    }
 }
 
 impl From<&str> for Currency {
-    fn from(s: &str) -> Self { Self(s.to_owned()) }
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
 }
 
 impl AsRef<str> for Currency {
-    fn as_ref(&self) -> &str { &self.0 }
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,7 +168,9 @@ pub enum MarketStatus {
     Unknown,
 }
 
-fn default_market_status() -> MarketStatus { MarketStatus::Unknown }
+fn default_market_status() -> MarketStatus {
+    MarketStatus::Unknown
+}
 
 /// Unified market snapshot — used by the markets endpoint (as the `snapshot`
 /// sub-object) and by the dealing endpoints (as the embedded `market` /
@@ -249,6 +261,9 @@ mod tests {
     fn epic_round_trips() {
         let e: Epic = serde_json::from_str("\"CS.D.GBPUSD.TODAY.IP\"").unwrap();
         assert_eq!(e.as_str(), "CS.D.GBPUSD.TODAY.IP");
-        assert_eq!(serde_json::to_string(&e).unwrap(), "\"CS.D.GBPUSD.TODAY.IP\"");
+        assert_eq!(
+            serde_json::to_string(&e).unwrap(),
+            "\"CS.D.GBPUSD.TODAY.IP\""
+        );
     }
 }

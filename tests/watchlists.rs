@@ -5,9 +5,9 @@
 mod support;
 
 use support::mock_server::IgMockServer;
-use trading_ig::watchlists::{CreateWatchlistRequest, CreateWatchlistStatus};
 use trading_ig::markets::models::MarketStatus;
 use trading_ig::models::common::Epic;
+use trading_ig::watchlists::{CreateWatchlistRequest, CreateWatchlistStatus};
 
 // ---------------------------------------------------------------------------
 // list
@@ -17,7 +17,8 @@ use trading_ig::models::common::Epic;
 async fn list_watchlists_golden() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get("watchlists", 1, "watchlists/list_v1.json").await;
+    mock.mount_get("watchlists", 1, "watchlists/list_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -49,7 +50,8 @@ async fn list_watchlists_golden() {
 async fn markets_in_watchlist_golden() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get("watchlists/12345678", 1, "watchlists/markets_v1.json").await;
+    mock.mount_get("watchlists/12345678", 1, "watchlists/markets_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -81,7 +83,8 @@ async fn markets_in_watchlist_golden() {
 async fn create_watchlist_success() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_post("watchlists", 1, "watchlists/create_v1.json").await;
+    mock.mount_post("watchlists", 1, "watchlists/create_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -104,7 +107,8 @@ async fn create_watchlist_success() {
 async fn create_watchlist_partial_success() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_post("watchlists", 1, "watchlists/create_partial_v1.json").await;
+    mock.mount_post("watchlists", 1, "watchlists/create_partial_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -117,9 +121,16 @@ async fn create_watchlist_partial_success() {
         ],
     };
 
-    let resp = client.watchlists().create(req).await.expect("create partial");
+    let resp = client
+        .watchlists()
+        .create(req)
+        .await
+        .expect("create partial");
     assert_eq!(resp.watchlist_id, "87654322");
-    assert_eq!(resp.status, CreateWatchlistStatus::SuccessNotAllInstrumentsAdded);
+    assert_eq!(
+        resp.status,
+        CreateWatchlistStatus::SuccessNotAllInstrumentsAdded
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +141,8 @@ async fn create_watchlist_partial_success() {
 async fn add_market_golden() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_put("watchlists/12345678", 1, "watchlists/add_market_v1.json").await;
+    mock.mount_put("watchlists/12345678", 1, "watchlists/add_market_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -154,7 +166,8 @@ async fn remove_market_golden() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
     // Path: watchlists/{id}/{epic} — epic dots are part of the raw path
-    mock.mount_delete("watchlists/12345678/CS.D.GBPUSD.TODAY.IP", 1).await;
+    mock.mount_delete("watchlists/12345678/CS.D.GBPUSD.TODAY.IP", 1)
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");

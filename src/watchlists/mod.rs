@@ -15,11 +15,11 @@
 mod api;
 pub mod models;
 
+pub use crate::markets::models::MarketSummary;
 pub use models::{
     AddMarketResponse, CreateWatchlistRequest, CreateWatchlistResponse, CreateWatchlistStatus,
     DeleteWatchlistResponse, RemoveMarketResponse, WatchlistSummary,
 };
-pub use crate::markets::models::MarketSummary;
 
 use crate::IgClient;
 

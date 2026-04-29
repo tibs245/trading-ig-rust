@@ -4,7 +4,9 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 // DealConfirmation and DealStatus are re-exported from dealing::positions via dealing::common.
-use crate::models::common::{DealId, DealReference, Direction, Epic, MarketSnapshot, OrderType, TimeInForce};
+use crate::models::common::{
+    DealId, DealReference, Direction, Epic, MarketSnapshot, OrderType, TimeInForce,
+};
 
 // MarketSnapshot is defined in models::common (unified across all domains).
 

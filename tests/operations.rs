@@ -2,9 +2,9 @@
 
 mod support;
 
+use support::fixtures;
 use support::matchers::{HasApiKey, HasVersion};
 use support::mock_server::IgMockServer;
-use support::fixtures;
 use trading_ig::Error;
 use trading_ig::operations::{ApplicationStatus, UpdateApplicationRequest};
 use wiremock::matchers::{method, path};

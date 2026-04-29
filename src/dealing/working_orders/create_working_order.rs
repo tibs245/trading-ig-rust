@@ -72,7 +72,8 @@ impl<E, Di, Si, O, C, X, L, T, G> std::fmt::Debug
     for CreateWorkingOrderBuilder<'_, E, Di, Si, O, C, X, L, T, G>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CreateWorkingOrderBuilder").finish_non_exhaustive()
+        f.debug_struct("CreateWorkingOrderBuilder")
+            .finish_non_exhaustive()
     }
 }
 
@@ -164,9 +165,7 @@ impl<'c, Di, Si, O, C, X, L, T, G>
     }
 }
 
-impl<'c, E, Si, O, C, X, L, T, G>
-    CreateWorkingOrderBuilder<'c, E, Missing, Si, O, C, X, L, T, G>
-{
+impl<'c, E, Si, O, C, X, L, T, G> CreateWorkingOrderBuilder<'c, E, Missing, Si, O, C, X, L, T, G> {
     /// Set the deal direction.
     pub fn direction(
         self,
@@ -194,11 +193,12 @@ impl<'c, E, Si, O, C, X, L, T, G>
     }
 }
 
-impl<'c, E, Di, O, C, X, L, T, G>
-    CreateWorkingOrderBuilder<'c, E, Di, Missing, O, C, X, L, T, G>
-{
+impl<'c, E, Di, O, C, X, L, T, G> CreateWorkingOrderBuilder<'c, E, Di, Missing, O, C, X, L, T, G> {
     /// Set the order size.
-    pub fn size(self, size: f64) -> CreateWorkingOrderBuilder<'c, E, Di, Set<f64>, O, C, X, L, T, G> {
+    pub fn size(
+        self,
+        size: f64,
+    ) -> CreateWorkingOrderBuilder<'c, E, Di, Set<f64>, O, C, X, L, T, G> {
         CreateWorkingOrderBuilder {
             client: self.client,
             epic: self.epic,
@@ -403,9 +403,7 @@ impl<'c, E, Di, Si, O, C, X, L, T>
 
 // ── Optional setters (available on any state) ─────────────────────────────────
 
-impl<E, Di, Si, O, C, X, L, T, G>
-    CreateWorkingOrderBuilder<'_, E, Di, Si, O, C, X, L, T, G>
-{
+impl<E, Di, Si, O, C, X, L, T, G> CreateWorkingOrderBuilder<'_, E, Di, Si, O, C, X, L, T, G> {
     /// Force open a new position even if a conflicting position exists.
     pub fn with_force_open(mut self, force_open: bool) -> Self {
         self.force_open = Some(force_open);
@@ -572,7 +570,13 @@ pub(super) async fn fetch_confirmation(
     for attempt in 1u8..=5 {
         match client
             .transport
-            .request::<(), DealConfirmation>(Method::GET, &path, Some(1), None::<&()>, &client.session)
+            .request::<(), DealConfirmation>(
+                Method::GET,
+                &path,
+                Some(1),
+                None::<&()>,
+                &client.session,
+            )
             .await
         {
             Ok(conf) => return Ok(conf),

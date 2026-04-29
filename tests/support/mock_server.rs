@@ -168,7 +168,13 @@ impl IgMockServer {
     }
 
     /// Mount an arbitrary error response.
-    pub async fn mount_error(&self, http_method: &str, path_str: &str, status: u16, error_code: &str) -> &Self {
+    pub async fn mount_error(
+        &self,
+        http_method: &str,
+        path_str: &str,
+        status: u16,
+        error_code: &str,
+    ) -> &Self {
         Mock::given(method(http_method))
             .and(path(path_str))
             .and(header_exists("X-IG-API-KEY"))

@@ -151,7 +151,10 @@ async fn get_many_returns_multiple_market_details() {
         .expect("get_many ok");
 
     assert_eq!(details.len(), 2);
-    assert_eq!(details[0].instrument.epic, Epic::new("CS.D.EURUSD.TODAY.IP"));
+    assert_eq!(
+        details[0].instrument.epic,
+        Epic::new("CS.D.EURUSD.TODAY.IP")
+    );
     assert_eq!(
         details[0].instrument.instrument_type,
         InstrumentType::Currencies
@@ -224,12 +227,8 @@ async fn get_many_empty_epics_returns_invalid_input() {
 async fn get_single_market_returns_details() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get(
-        "markets/CS.D.GBPUSD.TODAY.IP",
-        3,
-        "markets/get_v3.json",
-    )
-    .await;
+    mock.mount_get("markets/CS.D.GBPUSD.TODAY.IP", 3, "markets/get_v3.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");

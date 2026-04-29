@@ -106,19 +106,20 @@ impl Transport {
         .await
     }
 
-    /// Authenticated request. Reads the active tokens from `session` and
-    /// injects the appropriate auth headers.
-    pub(crate) async fn request<B, R>(
+    /// Authenticated request returning the raw response (status + headers +
+    /// body bytes). Used by endpoints that need to read response headers,
+    /// e.g. `GET /session?fetchSessionTokens=true` which puts the CST and
+    /// X-SECURITY-TOKEN values into headers, not the body.
+    pub(crate) async fn request_authenticated_raw<B>(
         &self,
         method: Method,
         path: &str,
         version: Option<u8>,
         body: Option<&B>,
         session: &SharedSession,
-    ) -> Result<R>
+    ) -> Result<RawResponse>
     where
         B: Serialize + ?Sized,
-        R: DeserializeOwned,
     {
         let url = self.url(path)?;
         let mut headers = self.base_headers(version)?;
@@ -129,7 +130,10 @@ impl Transport {
             ));
         };
         match &tokens {
-            AuthTokens::Cst { cst, x_security_token } => {
+            AuthTokens::Cst {
+                cst,
+                x_security_token,
+            } => {
                 headers.insert(HDR_CST, HeaderValue::from_str(cst)?);
                 headers.insert(HDR_XST, HeaderValue::from_str(x_security_token)?);
             }
@@ -147,7 +151,6 @@ impl Transport {
                 }
             }
         }
-        // Avoid leaking tokens in spans.
         let span = debug_span!("ig.http", %method, path = %path, version = ?version);
         let inner = self.inner.clone();
 
@@ -159,6 +162,7 @@ impl Transport {
             debug!("sending request");
             let resp = req.send().await?;
             let status = resp.status();
+            let resp_headers = resp.headers().clone();
             let bytes = resp.bytes().await?;
             if !status.is_success() {
                 if status == StatusCode::UNAUTHORIZED {
@@ -166,22 +170,48 @@ impl Transport {
                 }
                 return Err(api_error(status, &bytes));
             }
-            // Endpoints that legitimately return an empty body (DELETE) need
-            // a `()` response type; let serde handle that case.
-            if bytes.is_empty() {
-                let null = serde_json::Value::Null;
-                return Ok(serde_json::from_value(null)?);
-            }
-            Ok(serde_json::from_slice(&bytes)?)
+            Ok(RawResponse {
+                status,
+                headers: resp_headers,
+                body: bytes,
+            })
         }
         .instrument(span)
         .await
+    }
+
+    /// Authenticated request that deserialises the JSON body. Reads the
+    /// active tokens from `session` and injects the appropriate auth headers.
+    pub(crate) async fn request<B, R>(
+        &self,
+        method: Method,
+        path: &str,
+        version: Option<u8>,
+        body: Option<&B>,
+        session: &SharedSession,
+    ) -> Result<R>
+    where
+        B: Serialize + ?Sized,
+        R: DeserializeOwned,
+    {
+        let raw = self
+            .request_authenticated_raw(method, path, version, body, session)
+            .await?;
+        if raw.body.is_empty() {
+            // Endpoints that legitimately return an empty body (DELETE) need
+            // a `()` response type; let serde handle that case.
+            return Ok(serde_json::from_value(serde_json::Value::Null)?);
+        }
+        Ok(serde_json::from_slice(&raw.body)?)
     }
 }
 
 fn api_error(status: StatusCode, body: &Bytes) -> Error {
     if let Ok(api) = serde_json::from_slice::<ApiError>(body) {
-        Error::Api { status, source: api }
+        Error::Api {
+            status,
+            source: api,
+        }
     } else {
         let snippet = String::from_utf8_lossy(body);
         Error::Api {

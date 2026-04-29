@@ -34,6 +34,8 @@ impl<'a> DealingApi<'a> {
 
     /// Access working-order endpoints.
     pub fn working_orders(&self) -> WorkingOrdersApi<'a> {
-        WorkingOrdersApi { client: self.client }
+        WorkingOrdersApi {
+            client: self.client,
+        }
     }
 }

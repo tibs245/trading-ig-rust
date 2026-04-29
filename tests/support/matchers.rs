@@ -45,7 +45,6 @@ pub struct HasCstHeaders;
 
 impl Match for HasCstHeaders {
     fn matches(&self, request: &Request) -> bool {
-        request.headers.contains_key("CST")
-            && request.headers.contains_key("X-SECURITY-TOKEN")
+        request.headers.contains_key("CST") && request.headers.contains_key("X-SECURITY-TOKEN")
     }
 }

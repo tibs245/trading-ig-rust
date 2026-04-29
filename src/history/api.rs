@@ -7,11 +7,11 @@ use http::Method;
 use crate::error::Result;
 use crate::time::{ApiVersion, format as fmt_dt};
 
+use super::HistoryApi;
 use super::models::{
     Activity, ActivityPage, ActivityRequest, ActivityV1, ActivityV1Envelope, Transaction,
     TransactionType, TransactionsRequest, TransactionsResponse,
 };
-use super::HistoryApi;
 
 impl HistoryApi<'_> {
     // ────────────────────────────────────────────────────────────────────────

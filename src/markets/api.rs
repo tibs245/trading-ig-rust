@@ -32,7 +32,13 @@ impl MarketsApi<'_> {
         let envelope: Envelope = self
             .client
             .transport
-            .request(Method::GET, &path, Some(1), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(1),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         Ok(envelope.markets)
     }
@@ -64,18 +70,20 @@ impl MarketsApi<'_> {
             market_details: Vec<MarketDetails>,
         }
 
-        let epic_list = epics
-            .iter()
-            .map(Epic::as_str)
-            .collect::<Vec<_>>()
-            .join(",");
+        let epic_list = epics.iter().map(Epic::as_str).collect::<Vec<_>>().join(",");
         let filter_str = filter.as_query_str();
         let path = format!("markets?epics={epic_list}&filter={filter_str}");
 
         let envelope: Envelope = self
             .client
             .transport
-            .request(Method::GET, &path, Some(2), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(2),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         Ok(envelope.market_details)
     }
@@ -94,7 +102,13 @@ impl MarketsApi<'_> {
         let path = format!("markets/{epic}");
         self.client
             .transport
-            .request(Method::GET, &path, Some(3), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(3),
+                None::<&()>,
+                &self.client.session,
+            )
             .await
     }
 
@@ -134,7 +148,13 @@ impl MarketsApi<'_> {
         let path = format!("marketnavigation/{node_id}");
         self.client
             .transport
-            .request(Method::GET, &path, Some(1), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                &path,
+                Some(1),
+                None::<&()>,
+                &self.client.session,
+            )
             .await
     }
 }

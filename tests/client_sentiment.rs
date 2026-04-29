@@ -40,12 +40,8 @@ async fn get_single_returns_sentiment() {
 async fn get_many_returns_all_sentiments() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get(
-        "clientsentiment",
-        1,
-        "client_sentiment/get_many_v1.json",
-    )
-    .await;
+    mock.mount_get("clientsentiment", 1, "client_sentiment/get_many_v1.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");

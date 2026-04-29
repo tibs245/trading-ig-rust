@@ -130,8 +130,16 @@ async fn activity_v3_auto_pagination_two_pages() {
         2,
         "should have combined activities from both pages"
     );
-    assert_eq!(activities[0].deal_id.as_str(), "DEAL001", "page 1 item first");
-    assert_eq!(activities[1].deal_id.as_str(), "DEAL002", "page 2 item second");
+    assert_eq!(
+        activities[0].deal_id.as_str(),
+        "DEAL001",
+        "page 1 item first"
+    );
+    assert_eq!(
+        activities[1].deal_id.as_str(),
+        "DEAL002",
+        "page 2 item second"
+    );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -176,12 +184,8 @@ async fn activity_v3_api_error_is_surfaced() {
 async fn activity_v3_detailed_parses_sub_objects() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get(
-        "history/activity",
-        3,
-        "history/activity_v3_detailed.json",
-    )
-    .await;
+    mock.mount_get("history/activity", 3, "history/activity_v3_detailed.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -287,12 +291,8 @@ async fn activity_by_date_range_v1_golden() {
 async fn transactions_v2_golden() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_get(
-        "history/transactions",
-        2,
-        "history/transactions_v2.json",
-    )
-    .await;
+    mock.mount_get("history/transactions", 2, "history/transactions_v2.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");
@@ -374,12 +374,8 @@ async fn transactions_v2_with_type_filter() {
     mock.mount_login_v3().await;
 
     // The request is sent as GET /history/transactions?type=DEPOSIT
-    mock.mount_get(
-        "history/transactions",
-        2,
-        "history/transactions_v2.json",
-    )
-    .await;
+    mock.mount_get("history/transactions", 2, "history/transactions_v2.json")
+        .await;
 
     let client = mock.client();
     client.session().login().await.expect("login");

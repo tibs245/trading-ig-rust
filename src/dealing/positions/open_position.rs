@@ -125,11 +125,10 @@ pub struct OpenPositionBuilder<'a, CC, Di, E, X, G, O, Si> {
     pub(super) quote_id: Option<String>,
 }
 
-impl<CC, Di, E, X, G, O, Si> std::fmt::Debug
-    for OpenPositionBuilder<'_, CC, Di, E, X, G, O, Si>
-{
+impl<CC, Di, E, X, G, O, Si> std::fmt::Debug for OpenPositionBuilder<'_, CC, Di, E, X, G, O, Si> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OpenPositionBuilder").finish_non_exhaustive()
+        f.debug_struct("OpenPositionBuilder")
+            .finish_non_exhaustive()
     }
 }
 
@@ -149,18 +148,7 @@ pub type ReadyOpenPositionBuilder<'a> = OpenPositionBuilder<
 // Constructor
 // ---------------------------------------------------------------------------
 
-impl<'a>
-    OpenPositionBuilder<
-        'a,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-        Missing,
-    >
-{
+impl<'a> OpenPositionBuilder<'a, Missing, Missing, Missing, Missing, Missing, Missing, Missing> {
     pub(super) fn new(api: &'a PositionsApi<'a>) -> Self {
         Self {
             api,
@@ -189,9 +177,7 @@ impl<'a>
 // Mandatory setters
 // ---------------------------------------------------------------------------
 
-impl<'a, Di, E, X, G, O, Si>
-    OpenPositionBuilder<'a, Missing, Di, E, X, G, O, Si>
-{
+impl<'a, Di, E, X, G, O, Si> OpenPositionBuilder<'a, Missing, Di, E, X, G, O, Si> {
     /// Set the ISO-4217 currency code.
     pub fn currency(
         self,
@@ -220,9 +206,7 @@ impl<'a, Di, E, X, G, O, Si>
     }
 }
 
-impl<'a, CC, E, X, G, O, Si>
-    OpenPositionBuilder<'a, CC, Missing, E, X, G, O, Si>
-{
+impl<'a, CC, E, X, G, O, Si> OpenPositionBuilder<'a, CC, Missing, E, X, G, O, Si> {
     /// Set the trade direction.
     pub fn direction(
         self,
@@ -251,9 +235,7 @@ impl<'a, CC, E, X, G, O, Si>
     }
 }
 
-impl<'a, CC, Di, X, G, O, Si>
-    OpenPositionBuilder<'a, CC, Di, Missing, X, G, O, Si>
-{
+impl<'a, CC, Di, X, G, O, Si> OpenPositionBuilder<'a, CC, Di, Missing, X, G, O, Si> {
     /// Set the instrument epic.
     pub fn epic(
         self,
@@ -282,9 +264,7 @@ impl<'a, CC, Di, X, G, O, Si>
     }
 }
 
-impl<'a, CC, Di, E, G, O, Si>
-    OpenPositionBuilder<'a, CC, Di, E, Missing, G, O, Si>
-{
+impl<'a, CC, Di, E, G, O, Si> OpenPositionBuilder<'a, CC, Di, E, Missing, G, O, Si> {
     /// Set the instrument expiry (`"DFB"`, `"-"`, or a date string).
     pub fn expiry(
         self,
@@ -313,9 +293,7 @@ impl<'a, CC, Di, E, G, O, Si>
     }
 }
 
-impl<'a, CC, Di, E, X, O, Si>
-    OpenPositionBuilder<'a, CC, Di, E, X, Missing, O, Si>
-{
+impl<'a, CC, Di, E, X, O, Si> OpenPositionBuilder<'a, CC, Di, E, X, Missing, O, Si> {
     /// Set whether the stop is guaranteed.
     pub fn guaranteed_stop(
         self,
@@ -344,9 +322,7 @@ impl<'a, CC, Di, E, X, O, Si>
     }
 }
 
-impl<'a, CC, Di, E, X, G, Si>
-    OpenPositionBuilder<'a, CC, Di, E, X, G, Missing, Si>
-{
+impl<'a, CC, Di, E, X, G, Si> OpenPositionBuilder<'a, CC, Di, E, X, G, Missing, Si> {
     /// Set the order type.
     pub fn order_type(
         self,
@@ -375,14 +351,9 @@ impl<'a, CC, Di, E, X, G, Si>
     }
 }
 
-impl<'a, CC, Di, E, X, G, O>
-    OpenPositionBuilder<'a, CC, Di, E, X, G, O, Missing>
-{
+impl<'a, CC, Di, E, X, G, O> OpenPositionBuilder<'a, CC, Di, E, X, G, O, Missing> {
     /// Set the position size.
-    pub fn size(
-        self,
-        s: f64,
-    ) -> OpenPositionBuilder<'a, CC, Di, E, X, G, O, Set<f64>> {
+    pub fn size(self, s: f64) -> OpenPositionBuilder<'a, CC, Di, E, X, G, O, Set<f64>> {
         OpenPositionBuilder {
             api: self.api,
             currency_code: self.currency_code,
@@ -410,9 +381,7 @@ impl<'a, CC, Di, E, X, G, O>
 // Optional setters (available on any builder state)
 // ---------------------------------------------------------------------------
 
-impl<CC, Di, E, X, G, O, Si>
-    OpenPositionBuilder<'_, CC, Di, E, X, G, O, Si>
-{
+impl<CC, Di, E, X, G, O, Si> OpenPositionBuilder<'_, CC, Di, E, X, G, O, Si> {
     /// Override `force_open` (defaults to `false`).
     pub fn force_open(mut self, fo: bool) -> Self {
         self.force_open = fo;

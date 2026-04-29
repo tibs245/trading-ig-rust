@@ -3,7 +3,9 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::models::common::{Currency, DealId, Direction, Epic, MarketSnapshot, OrderType, TimeInForce};
+use crate::models::common::{
+    Currency, DealId, Direction, Epic, MarketSnapshot, OrderType, TimeInForce,
+};
 
 // DealConfirmation and DealStatus are defined in dealing::common.
 // MarketSnapshot is defined in models::common.

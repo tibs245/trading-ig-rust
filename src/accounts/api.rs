@@ -27,7 +27,13 @@ impl AccountsApi<'_> {
         let envelope: Envelope = self
             .client
             .transport
-            .request(Method::GET, "accounts", Some(1), None::<&()>, &self.client.session)
+            .request(
+                Method::GET,
+                "accounts",
+                Some(1),
+                None::<&()>,
+                &self.client.session,
+            )
             .await?;
         Ok(envelope.accounts)
     }
