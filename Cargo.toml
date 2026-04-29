@@ -16,6 +16,12 @@ rustls-tls = ["reqwest/rustls-tls"]
 native-tls = ["reqwest/native-tls"]
 stream = []
 encryption = ["dep:rsa", "dep:base64"]
+# Live integration tests against demo-api.ig.com (read-only endpoints).
+# Run manually with credentials in the environment — never in CI.
+live = []
+# Additionally enables write/mutation tests (watchlist CRUD, preferences update).
+# Requires both this feature AND IG_LIVE_TRADING_OK=1 at runtime.
+live-trading = ["live"]
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "http2"] }
