@@ -1,0 +1,98 @@
+name: Release
+
+# Triggered by pushing a `vX.Y.Z` tag. Runs the full test suite, then
+# publishes to crates.io and creates a GitHub Release whose body is taken
+# from the matching section of CHANGELOG.md.
+#
+# To cut a release:
+#   1. Bump `version` in Cargo.toml and add a section to CHANGELOG.md
+#   2. Commit on main
+#   3. git tag vX.Y.Z && git push origin vX.Y.Z
+#
+# The workflow takes it from there.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write   # to create the GitHub Release
+
+jobs:
+  verify:
+    name: Verify release candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --all-features --no-deps -- -D warnings
+      - run: cargo test --all-targets --all-features
+      - env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --all-features
+
+      # Sanity check: the tag matches the Cargo.toml version.
+      - name: Tag matches Cargo.toml version
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME#v}"
+          ver=$(grep -E '^version\s*=' Cargo.toml | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::Tag v$tag does not match Cargo.toml version $ver"
+            exit 1
+          fi
+
+  publish-crate:
+    name: Publish to crates.io
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --token "$CARGO_REGISTRY_TOKEN"
+
+  github-release:
+    name: GitHub Release
+    needs: publish-crate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Extract the section of CHANGELOG.md that matches this tag's version.
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          set -eu
+          ver="${GITHUB_REF_NAME#v}"
+          # Match "## [VER]" up to (but not including) the next "## [" header.
+          awk -v ver="$ver" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "Could not find CHANGELOG section for $ver — using a generic note." >&2
+            echo "Release v$ver — see CHANGELOG.md for details." > release_notes.md
+          fi
+          echo "notes_path=release_notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: ${{ steps.changelog.outputs.notes_path }}
+          draft: false
+          prerelease: false
