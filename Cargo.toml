@@ -9,6 +9,17 @@ repository = "https://github.com/ig-python/trading-ig-rust"
 readme = "README.md"
 keywords = ["ig", "trading", "broker", "finance", "cfd"]
 categories = ["api-bindings", "finance"]
+# Files NOT included in the published package. The crate ships only the
+# source, examples, README, LICENSE, and changelog — internal docs and
+# the test suite (with its sizeable fixture set) stay in the repo.
+exclude = [
+    "tests/**",
+    "_knowledge/**",
+    "CLAUDE.md",
+    ".github/**",
+    ".cargo/**",
+    ".gitignore",
+]
 
 [features]
 default = ["rustls-tls"]
