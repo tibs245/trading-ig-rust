@@ -8,11 +8,13 @@
 use std::collections::HashMap;
 
 use reqwest::Client;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tracing::{debug, error, info, warn};
 
 use crate::error::{Error, Result};
+use crate::session::SessionHandle;
 use crate::streaming::protocol::{Frame, parse_line, parse_ok_block};
+use crate::streaming::reconnect::{AutoReconnect, StreamingEvent};
 use crate::streaming::subscription::Registry;
 
 // ---------------------------------------------------------------------------
@@ -64,6 +66,24 @@ impl LsStream {
 }
 
 // ---------------------------------------------------------------------------
+// CreateParams — bundles the arguments to LsConnection::create
+// ---------------------------------------------------------------------------
+
+/// Bundle of parameters for [`LsConnection::create`].
+///
+/// Introduced to keep the argument count within clippy's threshold.
+pub(crate) struct CreateParams {
+    pub(crate) endpoint: String,
+    pub(crate) username: String,
+    pub(crate) password: String,
+    pub(crate) registry: Registry,
+    pub(crate) shutdown_tx: watch::Sender<bool>,
+    pub(crate) policy: AutoReconnect,
+    pub(crate) event_tx: Option<mpsc::Sender<StreamingEvent>>,
+    pub(crate) session_handle: SessionHandle,
+}
+
+// ---------------------------------------------------------------------------
 // LsConnection
 // ---------------------------------------------------------------------------
 
@@ -76,13 +96,11 @@ impl LsStream {
 pub(crate) struct LsConnection {
     pub(crate) client: Client,
     pub(crate) endpoint: String,
-    /// Lightstreamer username (IG account ID) — retained for potential
-    /// session re-create after a fatal server-side termination.
-    #[allow(dead_code)]
+    /// Lightstreamer username (IG account ID) — retained for session re-create
+    /// after a fatal server-side termination.
     pub(crate) username: String,
-    /// Lightstreamer password (`CST-…|XST-…`) — retained for potential
-    /// session re-create after a fatal server-side termination.
-    #[allow(dead_code)]
+    /// Lightstreamer password (`CST-…|XST-…`) — retained for session re-create
+    /// after a fatal server-side termination.
     pub(crate) password: String,
     pub(crate) session_id: String,
     pub(crate) control_address: Option<String>,
@@ -94,29 +112,34 @@ impl LsConnection {
     /// Returns the connection object.  A background task is spawned that
     /// reads frames and dispatches them to registered subscribers.
     /// Sending `true` on `shutdown_tx` stops the read-loop.
-    pub(crate) async fn create(
-        endpoint: &str,
-        username: &str,
-        password: &str,
-        registry: Registry,
-        shutdown_tx: watch::Sender<bool>,
-    ) -> Result<Self> {
+    pub(crate) async fn create(params: CreateParams) -> Result<Self> {
+        let CreateParams {
+            endpoint,
+            username,
+            password,
+            registry,
+            shutdown_tx,
+            policy,
+            event_tx,
+            session_handle,
+        } = params;
+
         let client = Client::builder().build().map_err(Error::Http)?;
 
         let url = format!("{endpoint}/lightstreamer/create_session.txt");
         debug!(%url, "opening Lightstreamer session");
 
-        let mut params = HashMap::new();
-        params.insert("LS_op2", "create");
-        params.insert("LS_cid", "mgQkwtwdysogQz2BJ4Ji kOj2Bg");
-        params.insert("LS_adapter_set", "DEFAULT");
-        params.insert("LS_user", username);
-        params.insert("LS_password", password);
-        params.insert("LS_polling", "false");
+        let mut form = HashMap::new();
+        form.insert("LS_op2", "create");
+        form.insert("LS_cid", "mgQkwtwdysogQz2BJ4Ji kOj2Bg");
+        form.insert("LS_adapter_set", "DEFAULT");
+        form.insert("LS_user", username.as_str());
+        form.insert("LS_password", password.as_str());
+        form.insert("LS_polling", "false");
 
         let resp = client
             .post(&url)
-            .form(&params)
+            .form(&form)
             .send()
             .await
             .map_err(Error::Http)?;
@@ -137,9 +160,9 @@ impl LsConnection {
 
         let conn = LsConnection {
             client: client.clone(),
-            endpoint: endpoint.to_owned(),
-            username: username.to_owned(),
-            password: password.to_owned(),
+            endpoint: endpoint.clone(),
+            username: username.clone(),
+            password: password.clone(),
             session_id: session_id.clone(),
             control_address: control_address.clone(),
         };
@@ -148,9 +171,9 @@ impl LsConnection {
         let registry2 = registry.clone();
         let conn2 = LsConnection {
             client,
-            endpoint: endpoint.to_owned(),
-            username: username.to_owned(),
-            password: password.to_owned(),
+            endpoint,
+            username,
+            password,
             session_id,
             control_address,
         };
@@ -160,7 +183,7 @@ impl LsConnection {
                 _ = shutdown_rx.changed() => {
                     debug!("Lightstreamer read-loop: shutdown signal received");
                 }
-                () = read_loop(stream, registry2, conn2) => {}
+                () = read_loop(stream, registry2, conn2, policy, event_tx, session_handle) => {}
             }
         });
 
@@ -282,6 +305,52 @@ impl LsConnection {
 
         Ok(LsStream::new(resp))
     }
+
+    /// Create a brand-new Lightstreamer session (used during auto-reconnect).
+    ///
+    /// On success, the caller must replace the current stream and update
+    /// `self` with the returned connection's session ID / control address.
+    async fn create_session(&self) -> Result<(LsConnection, LsStream)> {
+        let url = format!("{}/lightstreamer/create_session.txt", self.endpoint);
+        debug!(%url, "re-creating Lightstreamer session after END");
+
+        let mut params = HashMap::new();
+        params.insert("LS_op2", "create");
+        params.insert("LS_cid", "mgQkwtwdysogQz2BJ4Ji kOj2Bg");
+        params.insert("LS_adapter_set", "DEFAULT");
+        params.insert("LS_user", self.username.as_str());
+        params.insert("LS_password", self.password.as_str());
+        params.insert("LS_polling", "false");
+
+        let resp = self
+            .client
+            .post(&url)
+            .form(&params)
+            .send()
+            .await
+            .map_err(Error::Http)?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.bytes().await.map_err(Error::Http)?;
+            return Err(Error::Auth(format!(
+                "Lightstreamer create_session (reconnect) failed ({status}): {}",
+                String::from_utf8_lossy(&body)
+            )));
+        }
+
+        let (session_id, control_address, stream) = read_ok_block(resp).await?;
+
+        let new_conn = LsConnection {
+            client: self.client.clone(),
+            endpoint: self.endpoint.clone(),
+            username: self.username.clone(),
+            password: self.password.clone(),
+            session_id,
+            control_address,
+        };
+        Ok((new_conn, stream))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -335,60 +404,242 @@ async fn read_ok_block(resp: reqwest::Response) -> Result<(String, Option<String
 // Read-loop
 // ---------------------------------------------------------------------------
 
-/// Background task: consume a line-stream from Lightstreamer, parse frames,
-/// and dispatch to the registry.  Handles `LOOP` by rebinding automatically.
-async fn read_loop(mut stream: LsStream, registry: Registry, mut conn: LsConnection) {
-    loop {
-        // Drain the current stream until we need to rebind or terminate.
-        let rebind = drain_stream(&mut stream, &registry, &mut conn).await;
-        if !rebind {
-            return;
-        }
+/// Outcome of draining a stream — determines the read-loop's next action.
+enum DrainOutcome {
+    /// Server sent `LOOP` or EOF: call `bind_session` on the same session.
+    Rebind,
+    /// Server sent `END` or fatal error: a full session reconnect is needed.
+    SessionEnded { reason: Option<String> },
+    /// Caller sent a shutdown signal or an unrecoverable internal error.
+    Terminate,
+}
 
-        // Attempt to rebind.
-        debug!("attempting bind_session");
-        match conn.bind().await {
-            Ok(new_stream) => {
-                stream = new_stream;
-                // Re-subscribe all active subscriptions.
-                let subs = registry.snapshot_for_resubscribe();
-                for (idx, name, fields, mode) in subs {
-                    if let Err(e) = conn.control("add", idx, &name, &fields, mode).await {
-                        warn!(error = %e, "failed to re-subscribe {name} after rebind");
+/// Background task: consume a line-stream from Lightstreamer, parse frames,
+/// and dispatch to the registry.  Handles:
+///
+/// - `LOOP` / EOF → rebind (same session).
+/// - `END` / fatal error → attempt a full reconnect if `policy.enabled`.
+async fn read_loop(
+    mut stream: LsStream,
+    registry: Registry,
+    mut conn: LsConnection,
+    policy: AutoReconnect,
+    event_tx: Option<mpsc::Sender<StreamingEvent>>,
+    session_handle: SessionHandle,
+) {
+    loop {
+        match drain_stream(&mut stream, &registry, &mut conn).await {
+            DrainOutcome::Rebind => {
+                // ---- Rebind path (existing LOOP behaviour) ----
+                debug!("attempting bind_session");
+                match conn.bind().await {
+                    Ok(new_stream) => {
+                        stream = new_stream;
+                        resubscribe_all(&conn, &registry).await;
+                        info!(
+                            session_id = %conn.session_id,
+                            "Lightstreamer session rebound"
+                        );
+                    }
+                    Err(e) => {
+                        error!(error = %e, "Lightstreamer bind_session failed; giving up");
+                        return;
                     }
                 }
-                info!(
-                    session_id = %conn.session_id,
-                    "Lightstreamer session rebound"
-                );
             }
-            Err(e) => {
-                error!(error = %e, "Lightstreamer bind_session failed; giving up");
+
+            DrainOutcome::SessionEnded { reason } => {
+                // ---- END / fatal path ----
+                if !policy.enabled {
+                    // Auto-reconnect disabled — close as before.
+                    debug!(reason = ?reason, "END received; auto-reconnect disabled");
+                    emit_event(
+                        event_tx.as_ref(),
+                        StreamingEvent::Disconnected {
+                            reason: reason.clone(),
+                        },
+                    )
+                    .await;
+                    return;
+                }
+
+                // Auto-reconnect loop.
+                let reconnected = attempt_reconnect(
+                    &mut conn,
+                    &mut stream,
+                    &registry,
+                    &policy,
+                    event_tx.as_ref(),
+                    &session_handle,
+                    reason,
+                )
+                .await;
+
+                if !reconnected {
+                    return;
+                }
+                // Reconnected — fall through to the outer loop and keep
+                // reading the new stream.
+            }
+
+            DrainOutcome::Terminate => {
                 return;
             }
         }
     }
 }
 
-/// Drain a stream until rebind is needed (`true`) or the session should terminate (`false`).
-async fn drain_stream(stream: &mut LsStream, registry: &Registry, conn: &mut LsConnection) -> bool {
+/// Try to re-establish the Lightstreamer session up to `policy.max_attempts`
+/// times, refreshing CST/XST tokens on each attempt.
+///
+/// Returns `true` if reconnect succeeded, `false` if permanently exhausted.
+async fn attempt_reconnect(
+    conn: &mut LsConnection,
+    stream: &mut LsStream,
+    registry: &Registry,
+    policy: &AutoReconnect,
+    event_tx: Option<&mpsc::Sender<StreamingEvent>>,
+    session_handle: &SessionHandle,
+    initial_reason: Option<String>,
+) -> bool {
+    let mut attempt: u32 = 0;
+    let mut last_error = initial_reason
+        .clone()
+        .unwrap_or_else(|| "session ended".to_owned());
+
+    loop {
+        attempt += 1;
+
+        // Check attempt limit before doing anything expensive.
+        if let Some(max) = policy.max_attempts
+            && attempt > max
+        {
+            error!(
+                attempts = attempt - 1,
+                "Lightstreamer auto-reconnect: max attempts exceeded; giving up"
+            );
+            emit_event(
+                event_tx,
+                StreamingEvent::ReconnectFailed {
+                    attempts: attempt - 1,
+                    error: last_error,
+                },
+            )
+            .await;
+            return false;
+        }
+
+        let backoff = policy.backoff_for_attempt(attempt);
+        warn!(
+            attempt,
+            backoff_ms = backoff.as_millis(),
+            reason = %last_error,
+            "Lightstreamer auto-reconnect: will retry"
+        );
+        tokio::time::sleep(backoff).await;
+
+        // Refresh the session tokens so `create_session` uses fresh CST/XST.
+        if let Err(e) = session_handle.session_api().login_v2().await {
+            last_error = format!("session refresh failed: {e}");
+            warn!(
+                attempt,
+                error = %e,
+                "Lightstreamer auto-reconnect: token refresh failed"
+            );
+            continue; // back off and retry
+        }
+
+        // Read the new password from the refreshed session state.
+        let state = session_handle.session.snapshot().await;
+        let new_password = if let Some(crate::session::AuthTokens::Cst {
+            cst,
+            x_security_token,
+        }) = state.tokens.as_ref()
+        {
+            format!("CST-{cst}|XST-{x_security_token}")
+        } else {
+            "unexpected token type after login_v2".clone_into(&mut last_error);
+            warn!(attempt, "Lightstreamer auto-reconnect: {}", last_error);
+            continue;
+        };
+
+        // Update the stored password so future reconnects use the new tokens.
+        conn.password = new_password;
+
+        // Open a new Lightstreamer session.
+        match conn.create_session().await {
+            Ok((new_conn, new_stream)) => {
+                info!(
+                    attempt,
+                    session_id = %new_conn.session_id,
+                    "Lightstreamer auto-reconnect: new session established"
+                );
+                *conn = new_conn;
+                *stream = new_stream;
+
+                // Re-subscribe all active subscriptions.
+                resubscribe_all(conn, registry).await;
+
+                emit_event(event_tx, StreamingEvent::Reconnected { attempt }).await;
+                return true;
+            }
+            Err(e) => {
+                last_error = format!("create_session failed: {e}");
+                warn!(
+                    attempt,
+                    error = %e,
+                    "Lightstreamer auto-reconnect: create_session failed"
+                );
+                // continue to next attempt
+            }
+        }
+    }
+}
+
+/// Re-subscribe all active entries in the registry on the current connection.
+async fn resubscribe_all(conn: &LsConnection, registry: &Registry) {
+    let subs = registry.snapshot_for_resubscribe();
+    for (idx, name, fields, mode) in subs {
+        if let Err(e) = conn.control("add", idx, &name, &fields, mode).await {
+            warn!(error = %e, "failed to re-subscribe {name} after reconnect");
+        }
+    }
+}
+
+/// Emit a [`StreamingEvent`] on the optional channel, ignoring a closed receiver.
+async fn emit_event(event_tx: Option<&mpsc::Sender<StreamingEvent>>, event: StreamingEvent) {
+    if let Some(tx) = event_tx {
+        // Best-effort; if the caller has dropped the receiver we simply skip.
+        let _ = tx.send(event).await;
+    }
+}
+
+/// Drain a stream until a rebind or session-level action is required.
+async fn drain_stream(
+    stream: &mut LsStream,
+    registry: &Registry,
+    conn: &mut LsConnection,
+) -> DrainOutcome {
     loop {
         match stream.next_line().await {
             Some(Ok(line)) => {
                 let frame = parse_line(line.as_bytes());
                 match handle_frame(frame, registry, conn).await {
                     FrameAction::Continue => {}
-                    FrameAction::Rebind => return true,
-                    FrameAction::Terminate => return false,
+                    FrameAction::Rebind => return DrainOutcome::Rebind,
+                    FrameAction::SessionEnded { reason } => {
+                        return DrainOutcome::SessionEnded { reason };
+                    }
+                    FrameAction::Terminate => return DrainOutcome::Terminate,
                 }
             }
             Some(Err(e)) => {
                 error!(error = %e, "Lightstreamer stream error");
-                return true;
+                return DrainOutcome::Rebind;
             }
             None => {
                 debug!("Lightstreamer stream EOF; will rebind");
-                return true;
+                return DrainOutcome::Rebind;
             }
         }
     }
@@ -402,6 +653,7 @@ async fn drain_stream(stream: &mut LsStream, registry: &Registry, conn: &mut LsC
 enum FrameAction {
     Continue,
     Rebind,
+    SessionEnded { reason: Option<String> },
     Terminate,
 }
 
@@ -434,7 +686,9 @@ async fn handle_frame(frame: Frame, registry: &Registry, conn: &mut LsConnection
         }
         Frame::End { cause } => {
             info!(cause = ?cause, "Lightstreamer END — session terminated by server");
-            FrameAction::Terminate
+            FrameAction::SessionEnded {
+                reason: cause.clone(),
+            }
         }
         Frame::Ok { session_id } if !session_id.is_empty() => {
             debug!(%session_id, "Lightstreamer OK (bind acknowledged)");

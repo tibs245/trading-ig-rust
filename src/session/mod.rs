@@ -90,3 +90,13 @@ pub(crate) struct SessionHandle {
     pub(crate) session: SharedSession,
     pub(crate) credentials: Option<Credentials>,
 }
+
+impl SessionHandle {
+    /// Wrap this handle in a [`SessionApi`] so callers can invoke session
+    /// operations (e.g. `login_v2`) without going through [`IgClient`].
+    pub(crate) fn session_api(&self) -> SessionApi {
+        SessionApi {
+            handle: self.clone(),
+        }
+    }
+}

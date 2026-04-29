@@ -22,7 +22,7 @@
 //! // v2 login gives CST/XST which Lightstreamer needs directly.
 //! client.session().login_v2().await?;
 //!
-//! let stream = client.streaming().connect().await?;
+//! let (stream, _events) = client.streaming().connect().await?;
 //! let mut rx = stream.subscribe_market("CS.D.GBPUSD.TODAY.IP").await?;
 //!
 //! while let Some(update) = rx.recv().await {
@@ -37,9 +37,11 @@ pub mod client;
 pub(crate) mod connection;
 pub mod events;
 pub mod protocol;
+pub mod reconnect;
 pub(crate) mod subscription;
 
 pub use client::{StreamingApi, StreamingClient};
 pub use events::{
     AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, TradeUpdate,
 };
+pub use reconnect::{AutoReconnect, StreamingEvent};

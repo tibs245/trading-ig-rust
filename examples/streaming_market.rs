@@ -90,8 +90,8 @@ mod stream_impl {
             session_info.account_id, session_info.lightstreamer_endpoint
         );
 
-        // Connect to Lightstreamer.
-        let stream = client.streaming().connect().await?;
+        // Connect to Lightstreamer (auto-reconnect enabled by default).
+        let (stream, _events) = client.streaming().connect().await?;
         println!("Lightstreamer session: {}", stream.session_id());
 
         // Subscribe to market price updates.
