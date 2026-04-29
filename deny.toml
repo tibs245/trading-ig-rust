@@ -31,13 +31,15 @@ ignore = [
 
 [licenses]
 version = 2
-# License families we accept upstream.
+# License families we accept upstream. All permissive, OSI-approved,
+# commercial-friendly. No copyleft (GPL/LGPL/AGPL).
 allow = [
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "BSL-1.0",            # Boost — pulled in transitively by polars (xxhash-rust)
     "ISC",
     "Unicode-3.0",
     "Unicode-DFS-2016",
@@ -48,6 +50,20 @@ allow = [
 ]
 confidence-threshold = 0.9
 exceptions = []
+
+# Some crates ship a LICENSE file but forget to declare `license = "..."`
+# in their Cargo.toml. cargo-deny treats these as "no license" and
+# rejects them by default. The clarifications below override that
+# verdict with the license actually present in the package's source.
+[[licenses.clarify]]
+crate = "polars-arrow-format@0.1.0"
+expression = "Apache-2.0"
+# `license-files = []` means "trust the maintainer-asserted expression
+# above without hashing the LICENSE file" — acceptable here because the
+# package is a thin re-export of the upstream Apache-2.0 arrow-format
+# crate from the polars project. If you bump the version, double-check
+# the LICENSE file before extending this clarification.
+license-files = []
 
 [bans]
 multiple-versions = "warn"   # only warn — transitive duplicates are common
