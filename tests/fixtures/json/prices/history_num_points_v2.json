@@ -1,0 +1,26 @@
+{
+  "instrumentType": "CURRENCIES",
+  "prices": [
+    {
+      "snapshotTime": "2014/12/15 09:00:00",
+      "snapshotTimeUTC": "2014-12-15T09:00:00",
+      "openPrice": { "bid": 1.5630, "ask": 1.5632, "lastTraded": null },
+      "closePrice": { "bid": 1.5635, "ask": 1.5637, "lastTraded": null },
+      "highPrice": { "bid": 1.5640, "ask": 1.5642, "lastTraded": null },
+      "lowPrice": { "bid": 1.5625, "ask": 1.5627, "lastTraded": null },
+      "lastTradedVolume": 1234
+    }
+  ],
+  "metadata": {
+    "pageData": {
+      "pageNumber": 1,
+      "pageSize": 20,
+      "totalPages": 1
+    },
+    "allowance": {
+      "remainingAllowance": 9999,
+      "totalAllowance": 10000,
+      "allowanceExpiry": 604800
+    }
+  }
+}

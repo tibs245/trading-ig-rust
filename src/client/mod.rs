@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 use crate::config::IgConfig;
 use crate::markets::MarketsApi;
+use crate::prices::PricesApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
 use http::Transport;
@@ -49,6 +50,16 @@ impl IgClient {
         &self.config
     }
 
+    /// Markets API: search, fetch, and navigate IG market instruments.
+    pub fn markets(&self) -> MarketsApi<'_> {
+        MarketsApi { client: self }
+    }
+
+    /// Historical prices API: v1, v2, v3 endpoints and auto-pagination.
+    pub fn prices(&self) -> PricesApi<'_> {
+        PricesApi { client: self }
+    }
+
     /// Session API: login, refresh, switch account, logout.
     pub fn session(&self) -> SessionApi {
         SessionApi {
@@ -58,10 +69,5 @@ impl IgClient {
                 credentials: self.credentials.clone(),
             },
         }
-    }
-
-    /// Markets API: search, fetch, and navigate IG market instruments.
-    pub fn markets(&self) -> MarketsApi<'_> {
-        MarketsApi { client: self }
     }
 }

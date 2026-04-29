@@ -1,0 +1,16 @@
+{
+  "instrumentType": "CURRENCIES",
+  "prices": [],
+  "metadata": {
+    "pageData": {
+      "pageNumber": 1,
+      "pageSize": 20,
+      "totalPages": 0
+    },
+    "allowance": {
+      "remainingAllowance": 9999,
+      "totalAllowance": 10000,
+      "allowanceExpiry": 604800
+    }
+  }
+}
