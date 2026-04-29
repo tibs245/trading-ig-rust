@@ -24,6 +24,7 @@ pub use builder::IgClientBuilder;
 use std::sync::Arc;
 
 use crate::config::IgConfig;
+use crate::prices::PricesApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
 use http::Transport;
@@ -46,6 +47,11 @@ impl IgClient {
     /// Read-only access to the resolved configuration.
     pub fn config(&self) -> &IgConfig {
         &self.config
+    }
+
+    /// Historical prices API: v1, v2, v3 endpoints and auto-pagination.
+    pub fn prices(&self) -> PricesApi<'_> {
+        PricesApi { client: self }
     }
 
     /// Session API: login, refresh, switch account, logout.
