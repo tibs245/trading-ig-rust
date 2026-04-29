@@ -1,0 +1,15 @@
+{
+  "activities": [
+    {
+      "channel": "WEB",
+      "date": "2024:01:15-10:00:00",
+      "dealId": "DEAL001",
+      "description": "Position opened",
+      "details": null,
+      "epic": "CS.D.GBPUSD.TODAY.IP",
+      "period": "DFB",
+      "status": "Accepted",
+      "type": "POSITION"
+    }
+  ]
+}

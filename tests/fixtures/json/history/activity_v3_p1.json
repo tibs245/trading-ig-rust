@@ -1,0 +1,21 @@
+{
+  "activities": [
+    {
+      "date": "2024-01-15T10:00:00",
+      "epic": "CS.D.GBPUSD.TODAY.IP",
+      "period": "DFB",
+      "dealId": "DEAL001",
+      "channel": "WEB",
+      "type": "POSITION",
+      "status": "ACCEPTED",
+      "description": "Position opened: Buy 1 GBP/USD",
+      "details": null
+    }
+  ],
+  "metadata": {
+    "paging": {
+      "next": "history/activity?pageSize=50&from=2024-01-01T00:00:00&_page=2",
+      "size": 1
+    }
+  }
+}

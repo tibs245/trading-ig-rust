@@ -1,0 +1,21 @@
+{
+  "activities": [
+    {
+      "date": "2024-01-14T09:30:00",
+      "epic": "CS.D.EURUSD.TODAY.IP",
+      "period": "DFB",
+      "dealId": "DEAL002",
+      "channel": "MOBILE",
+      "type": "WORKING_ORDER",
+      "status": "REJECTED",
+      "description": "Working order rejected: Limit order",
+      "details": null
+    }
+  ],
+  "metadata": {
+    "paging": {
+      "next": null,
+      "size": 1
+    }
+  }
+}

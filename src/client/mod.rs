@@ -24,6 +24,7 @@ pub use builder::IgClientBuilder;
 use std::sync::Arc;
 
 use crate::config::IgConfig;
+use crate::history::HistoryApi;
 use crate::markets::MarketsApi;
 use crate::prices::PricesApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
@@ -48,6 +49,11 @@ impl IgClient {
     /// Read-only access to the resolved configuration.
     pub fn config(&self) -> &IgConfig {
         &self.config
+    }
+
+    /// History API: activity (v1 + v3) and transactions (v1 + v2).
+    pub fn history(&self) -> HistoryApi<'_> {
+        HistoryApi { client: self }
     }
 
     /// Markets API: search, fetch, and navigate IG market instruments.

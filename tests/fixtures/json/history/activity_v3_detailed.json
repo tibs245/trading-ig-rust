@@ -1,0 +1,36 @@
+{
+  "activities": [
+    {
+      "date": "2024-01-15T10:00:00",
+      "epic": "CS.D.GBPUSD.TODAY.IP",
+      "period": "DFB",
+      "dealId": "DEAL001",
+      "channel": "WEB",
+      "type": "POSITION",
+      "status": "ACCEPTED",
+      "description": "Position opened: Buy 1 GBP/USD",
+      "details": {
+        "actions": [
+          {
+            "actionType": "POSITION_OPENED",
+            "affectedDealId": "DEAL001"
+          }
+        ],
+        "marketName": "GBP/USD",
+        "currency": "GBP",
+        "direction": "BUY",
+        "size": 1.0,
+        "limitLevel": null,
+        "stopLevel": 1.2500,
+        "trailingStop": false,
+        "guaranteedStop": false
+      }
+    }
+  ],
+  "metadata": {
+    "paging": {
+      "next": null,
+      "size": 1
+    }
+  }
+}
