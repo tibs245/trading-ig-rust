@@ -19,6 +19,7 @@ exclude = [
     ".github/**",
     ".cargo/**",
     ".gitignore",
+    "deny.toml",
 ]
 
 [features]
