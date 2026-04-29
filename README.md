@@ -51,6 +51,13 @@ async fn main() -> trading_ig::Result<()> {
 | `stream`      | no      | Lightstreamer streaming client           |
 | `encryption`  | no      | Encrypted-password login (RSA)           |
 
+## Project knowledge
+
+Internal conventions, architecture decisions, and the IG API spec live
+under [`_knowledge/`](_knowledge/). Start with
+[`_knowledge/index.md`](_knowledge/index.md) — it lists every file with
+a one-line summary so you can load only what you need.
+
 ## License
 
 BSD-3-Clause, mirroring the original [`trading-ig`](https://github.com/ig-python/trading-ig)
