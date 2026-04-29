@@ -42,6 +42,23 @@ async fn main() -> trading_ig::Result<()> {
 }
 ```
 
+### Examples
+
+Three self-contained examples live in [`examples/`](examples/):
+
+| Example | What it shows |
+| ------- | ------------- |
+| [`login_and_list_accounts`](examples/login_and_list_accounts.rs) | Log in (v3) and print all account IDs |
+| [`search_market_and_get_history`](examples/search_market_and_get_history.rs) | Search for EUR/USD, fetch the last hour of minute bars |
+| [`open_then_close_position`](examples/open_then_close_position.rs) | Type-state builder syntax for opening and closing a position |
+
+All examples read credentials from `IG_API_KEY`, `IG_USERNAME`, and `IG_PASSWORD`:
+
+```bash
+IG_API_KEY=xxx IG_USERNAME=you IG_PASSWORD=secret \
+  cargo run --example login_and_list_accounts
+```
+
 ## Cargo features
 
 | feature       | default | description                              |

@@ -8,7 +8,7 @@
 //! | v2      | `%Y/%m/%d %H:%M:%S`     | `2014/12/15 00:00:00` |
 //! | v3      | `%Y-%m-%dT%H:%M:%S`     | `2014-12-15T00:00:00` |
 //!
-//! Output formats vary even more: see [`docs/API_CATALOG.md`] for details.
+//! Output formats vary even more — see the project README for details.
 
 use chrono::NaiveDateTime;
 

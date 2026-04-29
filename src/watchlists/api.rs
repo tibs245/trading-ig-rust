@@ -43,9 +43,9 @@ impl WatchlistsApi<'_> {
     /// Calls `POST /watchlists` (v1).
     ///
     /// Check [`CreateWatchlistResponse::status`] — a
-    /// [`CreateWatchlistStatus::SuccessNotAllInstrumentsAdded`] result is
-    /// still HTTP 200 but indicates that one or more requested epics were not
-    /// added.
+    /// [`crate::watchlists::models::CreateWatchlistStatus::SuccessNotAllInstrumentsAdded`]
+    /// result is still HTTP 200 but indicates that one or more requested epics
+    /// were not added.
     #[tracing::instrument(skip_all)]
     pub async fn create(&self, req: CreateWatchlistRequest) -> Result<CreateWatchlistResponse> {
         self.client
