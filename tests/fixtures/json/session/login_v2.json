@@ -1,9 +1,28 @@
 {
-  "accountId": "ABC123",
+  "currentAccountId": "ABC123",
   "clientId": "999999",
   "timezoneOffset": 0,
   "lightstreamerEndpoint": "https://demo-apd.marketdatasystems.com",
   "currencyIsoCode": "EUR",
   "locale": "fr_FR",
-  "accountType": "CFD"
+  "accountType": "CFD",
+  "currencySymbol": "€",
+  "dealingEnabled": true,
+  "trailingStopsEnabled": false,
+  "hasActiveDemoAccounts": true,
+  "hasActiveLiveAccounts": false,
+  "accounts": [
+    {
+      "accountId": "ABC123",
+      "accountName": "Demo CFD",
+      "accountType": "CFD",
+      "preferred": true
+    }
+  ],
+  "accountInfo": {
+    "balance": 10000.0,
+    "deposit": 0.0,
+    "profitLoss": 0.0,
+    "available": 10000.0
+  }
 }

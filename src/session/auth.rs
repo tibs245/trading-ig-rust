@@ -40,6 +40,10 @@ struct LoginResponseV3 {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LoginResponseV2 {
+    /// IG returns this as `currentAccountId` in real responses; the
+    /// `accountId` alias preserves compatibility with older fixtures and
+    /// any non-IG mocks that follow the v3 naming.
+    #[serde(rename = "currentAccountId", alias = "accountId")]
     account_id: String,
     client_id: String,
     timezone_offset: Option<i32>,
