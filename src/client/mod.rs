@@ -32,6 +32,7 @@ use crate::operations::OperationsApi;
 use crate::prices::PricesApi;
 use crate::repeat_dealing::RepeatDealingApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
+use crate::watchlists::WatchlistsApi;
 
 use http::Transport;
 
@@ -100,4 +101,10 @@ impl IgClient {
             },
         }
     }
+
+    /// Watchlists API: list, create, delete watchlists; add/remove markets.
+    pub fn watchlists(&self) -> WatchlistsApi<'_> {
+        WatchlistsApi { client: self }
+    }
 }
+

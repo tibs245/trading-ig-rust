@@ -21,6 +21,7 @@ pub mod prices;
 pub mod repeat_dealing;
 pub mod session;
 pub mod time;
+pub mod watchlists;
 
 pub use client::{IgClient, IgClientBuilder};
 pub use config::{Environment, IgConfig};
