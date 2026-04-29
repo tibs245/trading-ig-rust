@@ -150,6 +150,23 @@ impl IgMockServer {
         self
     }
 
+    /// Mount a fixture-backed JSON response for an authenticated DELETE.
+    pub async fn mount_delete_json(&self, path_str: &str, version: u8, fixture: &str) -> &Self {
+        let body = fixtures::load(fixture);
+        Mock::given(method("DELETE"))
+            .and(path(path_str))
+            .and(HasApiKey)
+            .and(HasVersion(version))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Content-Type", "application/json; charset=UTF-8")
+                    .set_body_string(body),
+            )
+            .mount(&self.server)
+            .await;
+        self
+    }
+
     /// Mount an arbitrary error response.
     pub async fn mount_error(&self, http_method: &str, path_str: &str, status: u16, error_code: &str) -> &Self {
         Mock::given(method(http_method))

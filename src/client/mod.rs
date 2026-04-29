@@ -26,6 +26,7 @@ use std::sync::Arc;
 use crate::accounts::AccountsApi;
 use crate::client_sentiment::ClientSentimentApi;
 use crate::config::IgConfig;
+use crate::dealing::DealingApi;
 use crate::history::HistoryApi;
 use crate::markets::MarketsApi;
 use crate::operations::OperationsApi;
@@ -64,6 +65,11 @@ impl IgClient {
     /// Client sentiment API: long/short percentages for IG markets.
     pub fn client_sentiment(&self) -> ClientSentimentApi<'_> {
         ClientSentimentApi { client: self }
+    }
+
+    /// Dealing API: positions, working orders.
+    pub fn dealing(&self) -> DealingApi<'_> {
+        DealingApi::new(self)
     }
 
     /// History API: activity (v1 + v3) and transactions (v1 + v2).
@@ -107,4 +113,3 @@ impl IgClient {
         WatchlistsApi { client: self }
     }
 }
-

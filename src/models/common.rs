@@ -68,6 +68,18 @@ impl fmt::Display for Currency {
     }
 }
 
+impl From<String> for Currency {
+    fn from(s: String) -> Self { Self(s) }
+}
+
+impl From<&str> for Currency {
+    fn from(s: &str) -> Self { Self(s.to_owned()) }
+}
+
+impl AsRef<str> for Currency {
+    fn as_ref(&self) -> &str { &self.0 }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Direction {

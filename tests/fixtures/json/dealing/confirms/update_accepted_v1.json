@@ -1,0 +1,21 @@
+{
+  "dealReference": "ref-update-001",
+  "dealId": "DIAAAABBBCCC02",
+  "dealStatus": "ACCEPTED",
+  "reason": null,
+  "direction": "BUY",
+  "epic": "CS.D.GBPUSD.TODAY.IP",
+  "expiry": "DFB",
+  "level": 1.2345,
+  "size": 1.0,
+  "limitLevel": 1.3000,
+  "stopLevel": 1.1800,
+  "orderType": "MARKET",
+  "status": "AMENDED",
+  "guaranteedStop": false,
+  "trailingStop": false,
+  "profit": null,
+  "profitCurrency": null,
+  "date": "2024-01-15T10:00:00",
+  "affectedDeals": []
+}

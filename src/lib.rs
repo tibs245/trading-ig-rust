@@ -12,6 +12,7 @@ pub mod accounts;
 pub mod client;
 pub mod client_sentiment;
 pub mod config;
+pub mod dealing;
 pub mod error;
 pub mod history;
 pub mod markets;

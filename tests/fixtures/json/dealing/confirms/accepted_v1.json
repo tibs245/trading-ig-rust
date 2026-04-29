@@ -1,0 +1,21 @@
+{
+  "dealReference": "ref-open-001",
+  "dealId": "DIAAAABBBCCC04",
+  "dealStatus": "ACCEPTED",
+  "reason": null,
+  "direction": "BUY",
+  "epic": "CS.D.GBPUSD.TODAY.IP",
+  "expiry": "DFB",
+  "level": 1.2345,
+  "size": 1.0,
+  "limitLevel": null,
+  "stopLevel": null,
+  "orderType": "MARKET",
+  "status": "OPEN",
+  "guaranteedStop": false,
+  "trailingStop": false,
+  "profit": null,
+  "profitCurrency": null,
+  "date": "2024-01-15T09:30:01",
+  "affectedDeals": []
+}

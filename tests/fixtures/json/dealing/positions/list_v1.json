@@ -1,0 +1,33 @@
+{
+  "positions": [
+    {
+      "position": {
+        "contractSize": 1,
+        "controlledRisk": false,
+        "createdDate": "2024:01:15-09:30:00",
+        "dealId": "DIAAAABBBCCC01",
+        "dealReference": "ref-v1-001",
+        "direction": "BUY",
+        "level": 1.2345,
+        "limitLevel": null,
+        "size": 1.0,
+        "stopLevel": null,
+        "trailingStep": null,
+        "trailingStopDistance": null,
+        "currency": "GBP"
+      },
+      "market": {
+        "bid": 1.234,
+        "offer": 1.235,
+        "epic": "CS.D.GBPUSD.TODAY.IP",
+        "expiry": "DFB",
+        "instrumentName": "GBP/USD",
+        "instrumentType": "CURRENCIES",
+        "lotSize": 1,
+        "marketStatus": "TRADEABLE",
+        "scalingFactor": 10000,
+        "updateTime": "09:30:00"
+      }
+    }
+  ]
+}
