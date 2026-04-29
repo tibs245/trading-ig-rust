@@ -5,7 +5,9 @@ edition = "2024"
 rust-version = "1.94"
 description = "Async Rust client for the IG Markets REST and Lightstreamer streaming APIs"
 license = "BSD-3-Clause"
-repository = "https://github.com/ig-python/trading-ig-rust"
+repository = "https://github.com/tibs245/trading-ig-rust"
+homepage = "https://github.com/tibs245/trading-ig-rust"
+documentation = "https://docs.rs/trading-ig"
 readme = "README.md"
 keywords = ["ig", "trading", "broker", "finance", "cfd"]
 categories = ["api-bindings", "finance"]
@@ -21,6 +23,15 @@ exclude = [
     ".gitignore",
     "deny.toml",
 ]
+
+# docs.rs build configuration. Without these, docs.rs builds with the
+# default feature set only — `stream`, `encryption`, and `polars` would
+# be invisible. The `--cfg docsrs` flag activates the `#[cfg_attr(docsrs,
+# doc(cfg(feature = "…")))]` annotations that show feature gates in the
+# rendered docs.
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["rustls-tls"]
