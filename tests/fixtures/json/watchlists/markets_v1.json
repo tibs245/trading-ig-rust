@@ -1,0 +1,38 @@
+{
+  "markets": [
+    {
+      "instrumentName": "GBP/USD",
+      "expiry": "DFB",
+      "epic": "CS.D.GBPUSD.TODAY.IP",
+      "instrumentType": "CURRENCIES",
+      "bid": 1.2650,
+      "offer": 1.2652,
+      "high": 1.2680,
+      "low": 1.2620,
+      "percentageChange": 0.12,
+      "netChange": 0.0015,
+      "updateTime": "12:30:00",
+      "updateTimeUTC": "12:30:00",
+      "streamingPricesAvailable": true,
+      "marketStatus": "TRADEABLE",
+      "scalingFactor": 1
+    },
+    {
+      "instrumentName": "EUR/USD",
+      "expiry": "DFB",
+      "epic": "CS.D.EURUSD.TODAY.IP",
+      "instrumentType": "CURRENCIES",
+      "bid": 1.0750,
+      "offer": 1.0752,
+      "high": 1.0780,
+      "low": 1.0720,
+      "percentageChange": -0.05,
+      "netChange": -0.0005,
+      "updateTime": "12:30:00",
+      "updateTimeUTC": "12:30:00",
+      "streamingPricesAvailable": true,
+      "marketStatus": "TRADEABLE",
+      "scalingFactor": 1
+    }
+  ]
+}

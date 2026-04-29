@@ -14,6 +14,7 @@ pub mod error;
 pub mod models;
 pub mod session;
 pub mod time;
+pub mod watchlists;
 
 pub use client::{IgClient, IgClientBuilder};
 pub use config::{Environment, IgConfig};

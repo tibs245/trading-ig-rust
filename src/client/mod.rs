@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 use crate::config::IgConfig;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
+use crate::watchlists::WatchlistsApi;
 
 use http::Transport;
 
@@ -57,5 +58,10 @@ impl IgClient {
                 credentials: self.credentials.clone(),
             },
         }
+    }
+
+    /// Watchlists API: list, create, delete watchlists; add/remove markets.
+    pub fn watchlists(&self) -> WatchlistsApi<'_> {
+        WatchlistsApi { client: self }
     }
 }
