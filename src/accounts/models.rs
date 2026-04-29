@@ -15,22 +15,30 @@ pub enum AccountType {
 }
 
 /// Balance snapshot for a single account.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+///
+/// All numeric fields are `Option<f64>` because IG omits any of them on
+/// freshly created demo accounts (no funded positions → no unrealised P/L,
+/// no available-cash row, etc.) and we want to deserialise those responses
+/// rather than fail.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct AccountBalance {
     /// Net account value.
-    pub balance: f64,
+    pub balance: Option<f64>,
     /// Total deposited margin.
-    pub deposit: f64,
+    pub deposit: Option<f64>,
     /// Unrealised profit/loss across open positions.
-    pub profit_loss: f64,
+    pub profit_loss: Option<f64>,
     /// Cash available to trade without opening new positions.
-    pub available_cash: f64,
+    pub available_cash: Option<f64>,
 }
 
 /// A single IG account.
+///
+/// Most fields are `Option`al because IG omits them on demo accounts that
+/// lack the matching capability. Verified against live demo responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 #[allow(clippy::struct_excessive_bools)] // mirrors the IG API shape
 pub struct Account {
     /// Unique account identifier (e.g. `"ABC123"`).
@@ -44,19 +52,38 @@ pub struct Account {
     /// Whether funds can be transferred *to* the Master Account.
     ///
     /// IG uses the abbreviation `MA` (all-caps) in the JSON key.
+    /// Optional — absent in live demo responses.
     #[serde(rename = "canTransferToMA")]
-    pub can_transfer_to_ma: bool,
+    pub can_transfer_to_ma: Option<bool>,
     /// Whether funds can be transferred *from* the Master Account.
     ///
     /// IG uses the abbreviation `MA` (all-caps) in the JSON key.
+    /// Optional — absent in live demo responses.
     #[serde(rename = "canTransferFromMA")]
-    pub can_transfer_from_ma: bool,
+    pub can_transfer_from_ma: Option<bool>,
     /// `true` if this is the currently logged-in account.
     pub default_account: bool,
     /// `true` if this account is marked as preferred.
     pub preferred: bool,
-    /// Current balance details.
+    /// Current balance details. Optional because some account responses
+    /// (sparse demo accounts) omit the entire `balance` block.
     pub balance: AccountBalance,
+}
+
+impl Default for Account {
+    fn default() -> Self {
+        Self {
+            account_id: String::new(),
+            account_alias: None,
+            account_type: AccountType::Cfd,
+            account_name: String::new(),
+            can_transfer_to_ma: None,
+            can_transfer_from_ma: None,
+            default_account: false,
+            preferred: false,
+            balance: AccountBalance::default(),
+        }
+    }
 }
 
 /// Account trading preferences.

@@ -31,18 +31,18 @@ async fn list_accounts_golden_path() {
     assert_eq!(first.account_alias.as_deref(), Some("My CFD Account"));
     assert_eq!(first.account_type, AccountType::Cfd);
     assert_eq!(first.account_name, "Demo CFD");
-    assert!(first.can_transfer_to_ma);
-    assert!(!first.can_transfer_from_ma);
+    assert_eq!(first.can_transfer_to_ma, Some(true));
+    assert_eq!(first.can_transfer_from_ma, Some(false));
     assert!(first.default_account);
     assert!(first.preferred);
     // Exact equality is fine here — these are round-trips of JSON number
     // literals with no floating-point arithmetic in between.
     #[allow(clippy::float_cmp)]
     {
-        assert_eq!(first.balance.balance, 10_000.0);
-        assert_eq!(first.balance.deposit, 500.0);
-        assert_eq!(first.balance.profit_loss, 125.5);
-        assert_eq!(first.balance.available_cash, 9_500.0);
+        assert_eq!(first.balance.balance, Some(10_000.0));
+        assert_eq!(first.balance.deposit, Some(500.0));
+        assert_eq!(first.balance.profit_loss, Some(125.5));
+        assert_eq!(first.balance.available_cash, Some(9_500.0));
     }
 
     let second = &accounts[1];
