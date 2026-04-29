@@ -1,8 +1,8 @@
 //! Auto-reconnect policy for the Lightstreamer streaming client.
 //!
-//! Configure via [`StreamingApi::connect_with`] to control how the streaming
-//! client reacts when the server sends `END` or the connection drops
-//! unrecoverably.
+//! Configure via [`crate::streaming::StreamingApi::connect_with`] to control
+//! how the streaming client reacts when the server sends `END` or the
+//! connection drops unrecoverably.
 
 use std::time::Duration;
 

@@ -63,8 +63,51 @@ impl SessionApi {
             .ok_or_else(|| Error::Auth("no credentials configured on the client".into()))?;
 
         match creds {
-            Credentials::Password { username, password } => self.login_v3(username, password).await,
+            Credentials::Password { username, password } => {
+                self.login_v3(username, password, false).await
+            }
         }
+    }
+
+    /// Log in v3 with an **RSA-encrypted password** instead of plaintext.
+    ///
+    /// **Recommended for accounts that hold real funds** (live or funded
+    /// demo). The password is encrypted client-side with IG's published
+    /// RSA public key (PKCS#1 v1.5) before being sent over the wire, so
+    /// it never appears in plaintext in any intermediate proxy or
+    /// server-side log.
+    ///
+    /// Workflow (handled internally):
+    /// 1. `GET /session/encryptionKey` to fetch the public key + timestamp.
+    /// 2. `encrypt_password(password, key, timestamp)` (RSA PKCS#1v15).
+    /// 3. `POST /session` v3 with `encryptedPassword=true`.
+    ///
+    /// Behind the optional `encryption` cargo feature.
+    ///
+    /// # Errors
+    ///
+    /// - `Error::Api` if either the key fetch or the login itself returns
+    ///   a non-2xx response.
+    /// - `Error::Auth` if the encryption step fails (malformed key, bad
+    ///   key/timestamp combination, etc.).
+    #[cfg(feature = "encryption")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "encryption")))]
+    #[instrument(skip_all)]
+    pub async fn login_with_encryption(&self) -> Result<SessionInfo> {
+        let creds = self
+            .handle
+            .credentials
+            .as_ref()
+            .ok_or_else(|| Error::Auth("no credentials configured on the client".into()))?;
+        let Credentials::Password { username, password } = creds;
+
+        let key = self.encryption_key().await?;
+        let encrypted = crate::session::encryption::encrypt_password(
+            password,
+            &key.encryption_key,
+            key.time_stamp,
+        )?;
+        self.login_v3(username, &encrypted, true).await
     }
 
     /// Log in using the legacy v2 flow (CST + X-SECURITY-TOKEN response headers).
@@ -125,11 +168,16 @@ impl SessionApi {
         })
     }
 
-    async fn login_v3(&self, username: &str, password: &str) -> Result<SessionInfo> {
+    async fn login_v3(
+        &self,
+        username: &str,
+        password: &str,
+        encrypted_password: bool,
+    ) -> Result<SessionInfo> {
         let body = LoginRequest {
             identifier: username,
             password,
-            encrypted_password: false,
+            encrypted_password,
         };
 
         let resp = self

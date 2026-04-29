@@ -88,6 +88,30 @@ IG_API_KEY=xxx IG_USERNAME=you IG_PASSWORD=secret \
   cargo run --example login_and_list_accounts
 ```
 
+## 🔒 Recommended for funded accounts
+
+For any account that holds real money (live, or funded demo), we
+**recommend enabling the `encryption` feature** and using
+`session().login_with_encryption()` instead of `session().login()`.
+The password is then RSA-encrypted client-side with IG's public key
+before transmission — it never appears in plaintext in any
+intermediate proxy or server-side log, even in the event of a
+TLS MITM or compromised CA.
+
+```toml
+[dependencies]
+trading-ig = { version = "0.1", features = ["encryption"] }
+```
+
+```rust
+client.session().login_with_encryption().await?;
+// instead of:
+// client.session().login().await?;
+```
+
+See [`SECURITY.md`](SECURITY.md) for the full rationale and our
+disclosure policy.
+
 ## Cargo features
 
 | feature        | default | description                                              |

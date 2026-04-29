@@ -61,7 +61,7 @@ pub(crate) const MARKET_FIELDS: &[&str] = &[
 ];
 
 impl MarketUpdate {
-    /// Construct from a raw field-value slice (in [`MARKET_FIELDS`] order).
+    /// Construct from a raw field-value slice (in `MARKET_FIELDS` order).
     pub fn from_raw(epic: &str, state: &[Option<String>]) -> Self {
         let get = |i: usize| state.get(i).and_then(|v| v.as_deref());
         Self {

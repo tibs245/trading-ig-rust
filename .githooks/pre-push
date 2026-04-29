@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-push hook: run the full test suite before pushing to a remote.
+# pre-push hook: run the full test suite + a security audit before pushing.
 # Activate once after cloning with: `git config core.hooksPath .githooks`
 #
 # Skip with: `git push --no-verify` (e.g. for documentation-only branches).
@@ -8,5 +8,20 @@ set -euo pipefail
 
 echo "pre-push: cargo test --all-targets --all-features"
 cargo test --all-targets --all-features
+
+# cargo-audit catches new RustSec advisories before they hit the remote
+# CI. We ignore RUSTSEC-2023-0071 (rsa crate Marvin attack on PKCS#1v15
+# decryption — we only encrypt, not vulnerable; see SECURITY.md for the
+# full justification).
+#
+# Skip if cargo-audit isn't installed locally — don't block contributors
+# who haven't run `cargo install cargo-audit` yet. CI runs it
+# unconditionally.
+if command -v cargo-audit > /dev/null 2>&1; then
+  echo "pre-push: cargo audit"
+  cargo audit --deny warnings --ignore RUSTSEC-2023-0071
+else
+  echo "pre-push: cargo-audit not installed locally — skipping (run 'cargo install cargo-audit' to enable)"
+fi
 
 echo "pre-push: OK"

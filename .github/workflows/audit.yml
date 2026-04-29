@@ -31,7 +31,9 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit
-      - run: cargo audit --deny warnings
+      # Same ignore as ci.yml — see SECURITY.md for the rsa crate
+      # Marvin advisory rationale.
+      - run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071
 
   deny:
     name: cargo-deny

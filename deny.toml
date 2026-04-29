@@ -14,7 +14,20 @@ targets = [
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []
+ignore = [
+    # RUSTSEC-2023-0071 — "Marvin Attack" timing side-channel in PKCS#1 v1.5
+    # RSA decryption (rsa crate, no fixed upstream release as of 2026-04).
+    #
+    # Not applicable to this crate. We only ever ENCRYPT with IG's public
+    # key in `session::encryption::encrypt_password` (RsaPublicKey::encrypt),
+    # never decrypt. The Marvin attack requires a victim that decrypts
+    # ciphertexts and exposes timing information; we hold no private key
+    # and run no decryption code. See SECURITY.md for the full rationale.
+    #
+    # This ignore should be removed once `rsa` ships a fix
+    # (https://github.com/RustCrypto/RSA/issues/19).
+    "RUSTSEC-2023-0071",
+]
 
 [licenses]
 version = 2
