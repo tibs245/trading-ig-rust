@@ -17,8 +17,9 @@ pub mod models;
 
 pub use models::{
     AddMarketResponse, CreateWatchlistRequest, CreateWatchlistResponse, CreateWatchlistStatus,
-    DeleteWatchlistResponse, MarketSummary, RemoveMarketResponse, WatchlistSummary,
+    DeleteWatchlistResponse, RemoveMarketResponse, WatchlistSummary,
 };
+pub use crate::markets::models::MarketSummary;
 
 use crate::IgClient;
 

@@ -37,8 +37,8 @@ async fn list_v1_golden_path() {
     assert_eq!(p.deal_reference.as_str(), "ref-v1-001");
     assert_eq!(p.direction, Direction::Buy);
     assert!((p.size - 1.0).abs() < f64::EPSILON);
-    assert_eq!(p.market.epic.as_str(), "CS.D.GBPUSD.TODAY.IP");
-    assert_eq!(p.market.expiry, "DFB");
+    assert_eq!(p.market.epic.as_ref().map(trading_ig::models::Epic::as_str), Some("CS.D.GBPUSD.TODAY.IP"));
+    assert_eq!(p.market.expiry.as_deref(), Some("DFB"));
 }
 
 #[tokio::test]
@@ -375,7 +375,6 @@ async fn open_position_golden_path_accepted() {
         .currency("GBP")
         .expiry("DFB")
         .guaranteed_stop(false)
-        .expect("all mandatories set")
         .send()
         .await
         .expect("open succeeds");
@@ -411,7 +410,6 @@ async fn open_position_with_stop_and_limit() {
         .currency("GBP")
         .expiry("DFB")
         .guaranteed_stop(false)
-        .expect("all mandatories set")
         .with_stop_distance(20.0)
         .with_limit_distance(10.0)
         .send()
@@ -465,64 +463,12 @@ async fn open_position_confirmation_rejected() {
         .currency("GBP")
         .expiry("DFB")
         .guaranteed_stop(false)
-        .expect("all mandatories set")
         .send()
         .await
         .expect("open returns even for rejected confirmation");
 
     assert_eq!(confirmation.deal_status, DealStatus::Rejected);
     assert_eq!(confirmation.reason.as_deref(), Some("INSUFFICIENT_FUNDS"));
-}
-
-#[tokio::test]
-async fn open_builder_guaranteed_stop_fails_when_missing_mandatories() {
-    let mock = IgMockServer::start().await;
-    let client = mock.client();
-
-    // Partially populated builder — missing direction, size, order_type, etc.
-    // Only epic is set; calling guaranteed_stop should return an error.
-    let dealing = client.dealing();
-    let positions = dealing.positions();
-    let result = positions
-        .open()
-        .epic(Epic::new("CS.D.GBPUSD.TODAY.IP"))
-        .guaranteed_stop(false);
-
-    assert!(
-        result.is_err(),
-        "guaranteed_stop should fail when other mandatories are missing"
-    );
-    match result.unwrap_err() {
-        trading_ig::Error::InvalidInput(msg) => {
-            assert!(msg.contains("mandatory"), "error message: {msg}");
-        }
-        other => panic!("expected InvalidInput, got {other:?}"),
-    }
-}
-
-#[tokio::test]
-async fn open_builder_try_send_ready_fails_when_missing_mandatories() {
-    let mock = IgMockServer::start().await;
-    let client = mock.client();
-
-    // Partially populated builder — missing direction, size, order_type, etc.
-    let dealing = client.dealing();
-    let positions = dealing.positions();
-    let result = positions
-        .open()
-        .epic(Epic::new("CS.D.GBPUSD.TODAY.IP"))
-        .try_send_ready();
-
-    assert!(
-        result.is_err(),
-        "try_send_ready should fail when mandatories are missing"
-    );
-    match result.unwrap_err() {
-        trading_ig::Error::InvalidInput(msg) => {
-            assert!(msg.contains("mandatory"), "error message: {msg}");
-        }
-        other => panic!("expected InvalidInput, got {other:?}"),
-    }
 }
 
 // ---------------------------------------------------------------------------

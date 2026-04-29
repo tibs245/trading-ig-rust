@@ -7,9 +7,11 @@ use crate::Result;
 use crate::models::common::Epic;
 
 use super::WatchlistsApi;
+use crate::markets::models::MarketSummary;
+
 use super::models::{
     AddMarketResponse, CreateWatchlistRequest, CreateWatchlistResponse, DeleteWatchlistResponse,
-    MarketSummary, RemoveMarketResponse, WatchlistSummary,
+    RemoveMarketResponse, WatchlistSummary,
 };
 
 impl WatchlistsApi<'_> {

@@ -7,8 +7,9 @@ use tracing::instrument;
 use crate::dealing::working_orders::create_working_order::{
     CreateWorkingOrderBuilder, Missing, fetch_confirmation,
 };
+use crate::dealing::common::DealConfirmation;
 use crate::dealing::working_orders::models::{
-    DealConfirmation, UpdateWorkingOrderRequest, WorkingOrderEntryV1Raw, WorkingOrderEntryV2Raw,
+    UpdateWorkingOrderRequest, WorkingOrderEntryV1Raw, WorkingOrderEntryV2Raw,
     WorkingOrderV1, WorkingOrderV2,
 };
 use crate::error::Result;

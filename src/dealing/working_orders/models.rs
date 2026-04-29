@@ -3,95 +3,10 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::models::common::{Currency, DealId, DealReference, Direction, Epic, OrderType, TimeInForce};
+use crate::models::common::{Currency, DealId, Direction, Epic, MarketSnapshot, OrderType, TimeInForce};
 
-// ── Shared primitives (local copies — positions agent defines these too) ─────
-
-/// Deal status returned by the confirmation endpoint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum DealStatus {
-    Accepted,
-    Rejected,
-}
-
-/// Lightweight market snapshot attached to working-order list entries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MarketSnapshot {
-    /// IG market identifier.
-    pub epic: Epic,
-    /// Human-readable instrument name.
-    pub instrument_name: String,
-    /// Market expiry label (e.g. `"DFB"`, `"-"`, or a date string).
-    pub expiry: String,
-    /// Best bid price.
-    pub bid: Option<f64>,
-    /// Best offer/ask price.
-    pub offer: Option<f64>,
-    /// Current high.
-    pub high: Option<f64>,
-    /// Current low.
-    pub low: Option<f64>,
-    /// Percentage change today.
-    pub percentage_change: Option<f64>,
-    /// Net price change today.
-    pub net_change: Option<f64>,
-    /// Market status string (e.g. `"TRADEABLE"`, `"CLOSED"`).
-    pub market_status: Option<String>,
-    /// Update time string (format varies by version).
-    pub update_time: Option<String>,
-    /// Update time in UTC ISO-8601 format.
-    pub update_time_utc: Option<String>,
-    /// Decimal places on the price.
-    pub scaling_factor: Option<u32>,
-}
-
-/// Confirmation returned by `GET /confirms/{dealReference}`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DealConfirmation {
-    /// The unique deal identifier assigned by IG.
-    pub deal_id: Option<DealId>,
-    /// The deal reference that was polled.
-    pub deal_reference: DealReference,
-    /// Whether the deal was accepted or rejected.
-    pub deal_status: DealStatus,
-    /// Human-readable status description (may be absent on some accounts).
-    pub status: Option<String>,
-    /// Reason for rejection if `deal_status == Rejected`.
-    pub reason: Option<String>,
-    /// The EPIC of the affected instrument.
-    pub epic: Option<Epic>,
-    /// Direction of the deal.
-    pub direction: Option<Direction>,
-    /// Order level / price.
-    pub level: Option<f64>,
-    /// Order size.
-    pub size: Option<f64>,
-    /// Currency of the deal.
-    pub currency: Option<String>,
-    /// Guaranteed stop flag.
-    pub guaranteed_stop: Option<bool>,
-    /// Stop level if set.
-    pub stop_level: Option<f64>,
-    /// Stop distance if set.
-    pub stop_distance: Option<f64>,
-    /// Limit level if set.
-    pub limit_level: Option<f64>,
-    /// Limit distance if set.
-    pub limit_distance: Option<f64>,
-    /// Date the order expires (for `GOOD_TILL_DATE` orders).
-    pub good_till_date: Option<String>,
-    /// ISO date the order expires.
-    pub good_till_date_iso: Option<String>,
-    /// Time in force.
-    pub time_in_force: Option<TimeInForce>,
-    /// Order type.
-    pub order_type: Option<OrderType>,
-    /// Timestamp of the action.
-    pub date: Option<String>,
-}
+// DealConfirmation and DealStatus are defined in dealing::common.
+// MarketSnapshot is defined in models::common.
 
 // ── v1 working-order types ────────────────────────────────────────────────────
 

@@ -8,9 +8,11 @@ pub mod create_working_order;
 pub mod models;
 
 pub use models::{
-    DealConfirmation, DealStatus, MarketSnapshot, UpdateWorkingOrderRequest, WorkingOrderDataV1,
+    UpdateWorkingOrderRequest, WorkingOrderDataV1,
     WorkingOrderDataV2, WorkingOrderV1, WorkingOrderV2,
 };
+pub use crate::dealing::common::{DealConfirmation, DealStatus};
+pub use crate::models::common::MarketSnapshot;
 
 use crate::IgClient;
 

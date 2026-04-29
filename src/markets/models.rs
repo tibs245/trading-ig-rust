@@ -5,48 +5,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::models::common::Epic;
 
 // ---------------------------------------------------------------------------
-// Enumerations
+// Enumerations (InstrumentType and MarketStatus are in models::common)
 // ---------------------------------------------------------------------------
 
-/// IG instrument classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum InstrumentType {
-    Currencies,
-    Shares,
-    Indices,
-    Commodities,
-    Options,
-    Bonds,
-    Rates,
-    Sectors,
-    Funds,
-    SprintMarkets,
-    #[serde(other)]
-    Unknown,
-}
-
-/// Current trading status of a market.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum MarketStatus {
-    /// Market is open and tradeable.
-    Tradeable,
-    /// Edits (stop / limit moves) are allowed but new deals are not.
-    EditsOnly,
-    /// Market is closed for trading.
-    Closed,
-    /// Market is offline (e.g. weekend).
-    Offline,
-    /// Auction is in progress.
-    OnAuction,
-    /// Pre-market auction state.
-    OnAuctionNoEdits,
-    /// Suspended from trading.
-    Suspended,
-    #[serde(other)]
-    Unknown,
-}
+// Re-export for ergonomic use within this module.
+pub use crate::models::common::{InstrumentType, MarketStatus};
 
 /// Filter for the bulk-fetch (`GET /markets?epics=…`) endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -222,39 +185,8 @@ pub struct DealingRules {
     pub trailing_stops_preference: String,
 }
 
-/// Live price snapshot for a market.
-///
-/// Returned as the `snapshot` sub-object of `MarketDetails`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MarketSnapshot {
-    /// Current trading status.
-    pub market_status: MarketStatus,
-    /// Net price change since open.
-    pub net_change: f64,
-    /// Percentage price change since open.
-    pub percentage_change: f64,
-    /// Price update timestamp.
-    pub update_time: String,
-    /// Price delay in minutes.
-    pub delay_time: i32,
-    /// Current bid price (absent when market closed).
-    pub bid: Option<f64>,
-    /// Current offer / ask price (absent when market closed).
-    pub offer: Option<f64>,
-    /// Daily high price.
-    pub high: Option<f64>,
-    /// Daily low price.
-    pub low: Option<f64>,
-    /// Binary odds (for binary instruments only).
-    pub binary_odds: Option<f64>,
-    /// Number of decimal places in prices.
-    pub decimal_places_factor: Option<i32>,
-    /// Scaling factor applied to prices.
-    pub scaling_factor: i32,
-    /// Extra spread charged on controlled-risk orders.
-    pub controlled_risk_extra_spread: f64,
-}
+// MarketSnapshot is now defined in models::common and re-exported here.
+pub use crate::models::common::MarketSnapshot;
 
 /// Full market details — the canonical response from `GET /markets/{epic}` (v3)
 /// and each entry in `GET /markets?epics=…` (v2).

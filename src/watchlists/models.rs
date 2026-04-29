@@ -62,51 +62,6 @@ pub enum CreateWatchlistStatus {
 }
 
 // ---------------------------------------------------------------------------
-// Market summary (returned by `markets`)
-// ---------------------------------------------------------------------------
-
-/// A brief market snapshot inside a watchlist, as returned by
-/// `GET /watchlists/{id}`.
-///
-/// This type is defined locally in the `watchlists` domain. A similarly-named
-/// type may exist in the `markets` domain; after Vague 1 is merged the two
-/// can be unified in `src/models/common.rs` if they are identical.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MarketSummary {
-    /// Full display name of the instrument.
-    pub instrument_name: String,
-    /// Expiry code, e.g. `"DFB"` or `"Dec-24"`.
-    pub expiry: String,
-    /// IG market identifier.
-    pub epic: Epic,
-    /// Instrument category (e.g. `"CURRENCIES"`, `"SHARES"`).
-    pub instrument_type: String,
-    /// Current bid price.
-    pub bid: Option<f64>,
-    /// Current offer/ask price.
-    pub offer: Option<f64>,
-    /// Today's high.
-    pub high: Option<f64>,
-    /// Today's low.
-    pub low: Option<f64>,
-    /// Percentage change from the previous close.
-    pub percentage_change: Option<f64>,
-    /// Absolute net change from the previous close.
-    pub net_change: Option<f64>,
-    /// Local time of the last price update (HH:MM:SS).
-    pub update_time: Option<String>,
-    /// UTC time of the last price update (HH:MM:SS).
-    pub update_time_utc: Option<String>,
-    /// Whether streaming prices are available for this instrument.
-    pub streaming_prices_available: bool,
-    /// Market status (e.g. `"TRADEABLE"`, `"CLOSED"`).
-    pub market_status: String,
-    /// Scaling factor applied to prices.
-    pub scaling_factor: Option<i64>,
-}
-
-// ---------------------------------------------------------------------------
 // Add market
 // ---------------------------------------------------------------------------
 

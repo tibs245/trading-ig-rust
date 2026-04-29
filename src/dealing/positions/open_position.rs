@@ -2,57 +2,59 @@
 //!
 //! ## Design
 //!
-//! Two marker types gate the `.send()` method:
+//! Seven independent type parameters (one per mandatory field) enforce at
+//! compile time that all mandatory fields have been supplied before `.send()`
+//! becomes callable. Optional fields (`level`, stop/limit distances, etc.) are
+//! set via infallible setters at any point.
 //!
-//! - [`MissingMandatory`] — initial state; mandatory field setters return
-//!   `Self`; `.send()` is **not** available.
-//! - [`WithMandatories`] — reached after calling `.guaranteed_stop(bool)`,
-//!   which validates at runtime that all other mandatory fields have also been
-//!   set and transitions the type.  Optional setters are available on both
-//!   states; `.send()` is **only** available on `WithMandatories`.
+//! Type params: `CC`=`currency_code`, `Di`=`direction`, `E`=`epic`,
+//! `X`=`expiry`, `G`=`guaranteed_stop`, `O`=`order_type`, `Si`=`size`.
 //!
-//! Calling `.guaranteed_stop()` without first setting `epic`, `direction`,
-//! `size`, `order_type`, `currency`, and `expiry` returns
-//! `Err(Error::InvalidInput)`.  Callers who want explicit checking before the
-//! state transition can use [`OpenPositionBuilder::try_send_ready`].
+//! Note: `level` is left in the optional group — it is only required when
+//! `order_type` is `LIMIT` or `QUOTE`, which is a runtime condition.
 //!
 //! ## Typical usage
 //!
-//! ```ignore
-//! client.dealing().positions().open()
-//!     .epic("CS.D.GBPUSD.TODAY.IP")
+//! ```no_run
+//! # async fn run(client: trading_ig::IgClient) -> trading_ig::Result<()> {
+//! use trading_ig::models::common::{Currency, Direction, Epic, OrderType};
+//!
+//! let confirmation = client.dealing().positions().open()
+//!     .epic(Epic::new("CS.D.GBPUSD.TODAY.IP"))
 //!     .direction(Direction::Buy)
 //!     .size(1.0)
 //!     .order_type(OrderType::Market)
 //!     .currency("GBP")
 //!     .expiry("DFB")
-//!     .guaranteed_stop(false)   // ← transitions to WithMandatories
-//!     .with_stop_distance(20.0) // optional, on WithMandatories
+//!     .guaranteed_stop(false)
+//!     .with_stop_distance(20.0)
 //!     .send()
 //!     .await?;
+//! # Ok(()) }
 //! ```
 
 use http::Method;
 use serde::Serialize;
 use tracing::instrument;
 
-use crate::dealing::positions::models::{DealConfirmation, OpenPositionResponse};
-use crate::error::{Error, Result};
+use crate::dealing::common::DealConfirmation;
+use crate::dealing::positions::models::OpenPositionResponse;
+use crate::error::Result;
 use crate::models::common::{Currency, Direction, Epic, OrderType, TimeInForce};
 
 use super::api::PositionsApi;
 
 // ---------------------------------------------------------------------------
-// Marker types
+// Marker types (shared with working_orders style)
 // ---------------------------------------------------------------------------
 
-/// Marker: not all mandatory fields have been confirmed yet.
+/// Marker: this mandatory field has not yet been set.
 #[derive(Debug)]
-pub struct MissingMandatory;
+pub struct Missing;
 
-/// Marker: all mandatory fields are present — `.send()` is callable.
+/// Marker: this mandatory field has been set to type `T`.
 #[derive(Debug)]
-pub struct WithMandatories;
+pub struct Set<T>(pub(crate) T);
 
 // ---------------------------------------------------------------------------
 // Internal request body (serialised to JSON)
@@ -90,42 +92,86 @@ pub(super) struct OpenPositionBody {
 }
 
 // ---------------------------------------------------------------------------
-// Builder struct (shared fields across both states via a common base)
+// Builder struct
 // ---------------------------------------------------------------------------
 
-/// Shared inner state for both builder states.
-#[derive(Debug)]
-struct Inner {
-    currency_code: Option<Currency>,
-    direction: Option<Direction>,
-    epic: Option<Epic>,
-    expiry: Option<String>,
-    force_open: bool,
-    guaranteed_stop: Option<bool>,
-    order_type: Option<OrderType>,
-    size: Option<f64>,
-    level: Option<f64>,
-    limit_distance: Option<f64>,
-    limit_level: Option<f64>,
-    stop_distance: Option<f64>,
-    stop_level: Option<f64>,
-    trailing_stop: Option<bool>,
-    trailing_stop_increment: Option<f64>,
-    time_in_force: Option<TimeInForce>,
-    quote_id: Option<String>,
+/// Type-state builder for `POST /positions/otc` (v2).
+///
+/// Type params: `CC`=`currency_code`, `Di`=`direction`, `E`=`epic`,
+/// `X`=`expiry`, `G`=`guaranteed_stop`, `O`=`order_type`, `Si`=`size`.
+///
+/// Obtain via [`PositionsApi::open`]. Supply all mandatory fields (order
+/// independent), then call `.send()`.
+pub struct OpenPositionBuilder<'a, CC, Di, E, X, G, O, Si> {
+    pub(super) api: &'a PositionsApi<'a>,
+    // mandatory fields (type-state)
+    pub(super) currency_code: CC,
+    pub(super) direction: Di,
+    pub(super) epic: E,
+    pub(super) expiry: X,
+    pub(super) guaranteed_stop: G,
+    pub(super) order_type: O,
+    pub(super) size: Si,
+    // optional fields
+    pub(super) force_open: bool,
+    pub(super) level: Option<f64>,
+    pub(super) limit_distance: Option<f64>,
+    pub(super) limit_level: Option<f64>,
+    pub(super) stop_distance: Option<f64>,
+    pub(super) stop_level: Option<f64>,
+    pub(super) trailing_stop: Option<bool>,
+    pub(super) trailing_stop_increment: Option<f64>,
+    pub(super) time_in_force: Option<TimeInForce>,
+    pub(super) quote_id: Option<String>,
 }
 
-impl Inner {
-    fn new() -> Self {
+impl<CC, Di, E, X, G, O, Si> std::fmt::Debug
+    for OpenPositionBuilder<'_, CC, Di, E, X, G, O, Si>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenPositionBuilder").finish_non_exhaustive()
+    }
+}
+
+/// Fully-specified builder — the only state where `.send()` is callable.
+pub type ReadyOpenPositionBuilder<'a> = OpenPositionBuilder<
+    'a,
+    Set<Currency>,
+    Set<Direction>,
+    Set<Epic>,
+    Set<String>,
+    Set<bool>,
+    Set<OrderType>,
+    Set<f64>,
+>;
+
+// ---------------------------------------------------------------------------
+// Constructor
+// ---------------------------------------------------------------------------
+
+impl<'a>
+    OpenPositionBuilder<
+        'a,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+    >
+{
+    pub(super) fn new(api: &'a PositionsApi<'a>) -> Self {
         Self {
-            currency_code: None,
-            direction: None,
-            epic: None,
-            expiry: None,
+            api,
+            currency_code: Missing,
+            direction: Missing,
+            epic: Missing,
+            expiry: Missing,
+            guaranteed_stop: Missing,
+            order_type: Missing,
+            size: Missing,
             force_open: false,
-            guaranteed_stop: None,
-            order_type: None,
-            size: None,
             level: None,
             limit_distance: None,
             limit_level: None,
@@ -137,28 +183,216 @@ impl Inner {
             quote_id: None,
         }
     }
+}
 
-    fn all_mandatories_set(&self) -> bool {
-        self.currency_code.is_some()
-            && self.direction.is_some()
-            && self.epic.is_some()
-            && self.expiry.is_some()
-            && self.guaranteed_stop.is_some()
-            && self.order_type.is_some()
-            && self.size.is_some()
-    }
+// ---------------------------------------------------------------------------
+// Mandatory setters
+// ---------------------------------------------------------------------------
 
-    #[allow(clippy::unwrap_used)] // caller guarantees all_mandatories_set() is true
-    fn into_body(self) -> OpenPositionBody {
-        OpenPositionBody {
-            currency_code: self.currency_code.unwrap(),
-            direction: self.direction.unwrap(),
-            epic: self.epic.unwrap(),
-            expiry: self.expiry.unwrap(),
+impl<'a, Di, E, X, G, O, Si>
+    OpenPositionBuilder<'a, Missing, Di, E, X, G, O, Si>
+{
+    /// Set the ISO-4217 currency code.
+    pub fn currency(
+        self,
+        c: impl Into<Currency>,
+    ) -> OpenPositionBuilder<'a, Set<Currency>, Di, E, X, G, O, Si> {
+        OpenPositionBuilder {
+            api: self.api,
+            currency_code: Set(c.into()),
+            direction: self.direction,
+            epic: self.epic,
+            expiry: self.expiry,
+            guaranteed_stop: self.guaranteed_stop,
+            order_type: self.order_type,
+            size: self.size,
             force_open: self.force_open,
-            guaranteed_stop: self.guaranteed_stop.unwrap(),
-            order_type: self.order_type.unwrap(),
-            size: self.size.unwrap(),
+            level: self.level,
+            limit_distance: self.limit_distance,
+            limit_level: self.limit_level,
+            stop_distance: self.stop_distance,
+            stop_level: self.stop_level,
+            trailing_stop: self.trailing_stop,
+            trailing_stop_increment: self.trailing_stop_increment,
+            time_in_force: self.time_in_force,
+            quote_id: self.quote_id,
+        }
+    }
+}
+
+impl<'a, CC, E, X, G, O, Si>
+    OpenPositionBuilder<'a, CC, Missing, E, X, G, O, Si>
+{
+    /// Set the trade direction.
+    pub fn direction(
+        self,
+        d: Direction,
+    ) -> OpenPositionBuilder<'a, CC, Set<Direction>, E, X, G, O, Si> {
+        OpenPositionBuilder {
+            api: self.api,
+            currency_code: self.currency_code,
+            direction: Set(d),
+            epic: self.epic,
+            expiry: self.expiry,
+            guaranteed_stop: self.guaranteed_stop,
+            order_type: self.order_type,
+            size: self.size,
+            force_open: self.force_open,
+            level: self.level,
+            limit_distance: self.limit_distance,
+            limit_level: self.limit_level,
+            stop_distance: self.stop_distance,
+            stop_level: self.stop_level,
+            trailing_stop: self.trailing_stop,
+            trailing_stop_increment: self.trailing_stop_increment,
+            time_in_force: self.time_in_force,
+            quote_id: self.quote_id,
+        }
+    }
+}
+
+impl<'a, CC, Di, X, G, O, Si>
+    OpenPositionBuilder<'a, CC, Di, Missing, X, G, O, Si>
+{
+    /// Set the instrument epic.
+    pub fn epic(
+        self,
+        e: impl Into<Epic>,
+    ) -> OpenPositionBuilder<'a, CC, Di, Set<Epic>, X, G, O, Si> {
+        OpenPositionBuilder {
+            api: self.api,
+            currency_code: self.currency_code,
+            direction: self.direction,
+            epic: Set(e.into()),
+            expiry: self.expiry,
+            guaranteed_stop: self.guaranteed_stop,
+            order_type: self.order_type,
+            size: self.size,
+            force_open: self.force_open,
+            level: self.level,
+            limit_distance: self.limit_distance,
+            limit_level: self.limit_level,
+            stop_distance: self.stop_distance,
+            stop_level: self.stop_level,
+            trailing_stop: self.trailing_stop,
+            trailing_stop_increment: self.trailing_stop_increment,
+            time_in_force: self.time_in_force,
+            quote_id: self.quote_id,
+        }
+    }
+}
+
+impl<'a, CC, Di, E, G, O, Si>
+    OpenPositionBuilder<'a, CC, Di, E, Missing, G, O, Si>
+{
+    /// Set the instrument expiry (`"DFB"`, `"-"`, or a date string).
+    pub fn expiry(
+        self,
+        e: impl Into<String>,
+    ) -> OpenPositionBuilder<'a, CC, Di, E, Set<String>, G, O, Si> {
+        OpenPositionBuilder {
+            api: self.api,
+            currency_code: self.currency_code,
+            direction: self.direction,
+            epic: self.epic,
+            expiry: Set(e.into()),
+            guaranteed_stop: self.guaranteed_stop,
+            order_type: self.order_type,
+            size: self.size,
+            force_open: self.force_open,
+            level: self.level,
+            limit_distance: self.limit_distance,
+            limit_level: self.limit_level,
+            stop_distance: self.stop_distance,
+            stop_level: self.stop_level,
+            trailing_stop: self.trailing_stop,
+            trailing_stop_increment: self.trailing_stop_increment,
+            time_in_force: self.time_in_force,
+            quote_id: self.quote_id,
+        }
+    }
+}
+
+impl<'a, CC, Di, E, X, O, Si>
+    OpenPositionBuilder<'a, CC, Di, E, X, Missing, O, Si>
+{
+    /// Set whether the stop is guaranteed.
+    pub fn guaranteed_stop(
+        self,
+        gs: bool,
+    ) -> OpenPositionBuilder<'a, CC, Di, E, X, Set<bool>, O, Si> {
+        OpenPositionBuilder {
+            api: self.api,
+            currency_code: self.currency_code,
+            direction: self.direction,
+            epic: self.epic,
+            expiry: self.expiry,
+            guaranteed_stop: Set(gs),
+            order_type: self.order_type,
+            size: self.size,
+            force_open: self.force_open,
+            level: self.level,
+            limit_distance: self.limit_distance,
+            limit_level: self.limit_level,
+            stop_distance: self.stop_distance,
+            stop_level: self.stop_level,
+            trailing_stop: self.trailing_stop,
+            trailing_stop_increment: self.trailing_stop_increment,
+            time_in_force: self.time_in_force,
+            quote_id: self.quote_id,
+        }
+    }
+}
+
+impl<'a, CC, Di, E, X, G, Si>
+    OpenPositionBuilder<'a, CC, Di, E, X, G, Missing, Si>
+{
+    /// Set the order type.
+    pub fn order_type(
+        self,
+        ot: OrderType,
+    ) -> OpenPositionBuilder<'a, CC, Di, E, X, G, Set<OrderType>, Si> {
+        OpenPositionBuilder {
+            api: self.api,
+            currency_code: self.currency_code,
+            direction: self.direction,
+            epic: self.epic,
+            expiry: self.expiry,
+            guaranteed_stop: self.guaranteed_stop,
+            order_type: Set(ot),
+            size: self.size,
+            force_open: self.force_open,
+            level: self.level,
+            limit_distance: self.limit_distance,
+            limit_level: self.limit_level,
+            stop_distance: self.stop_distance,
+            stop_level: self.stop_level,
+            trailing_stop: self.trailing_stop,
+            trailing_stop_increment: self.trailing_stop_increment,
+            time_in_force: self.time_in_force,
+            quote_id: self.quote_id,
+        }
+    }
+}
+
+impl<'a, CC, Di, E, X, G, O>
+    OpenPositionBuilder<'a, CC, Di, E, X, G, O, Missing>
+{
+    /// Set the position size.
+    pub fn size(
+        self,
+        s: f64,
+    ) -> OpenPositionBuilder<'a, CC, Di, E, X, G, O, Set<f64>> {
+        OpenPositionBuilder {
+            api: self.api,
+            currency_code: self.currency_code,
+            direction: self.direction,
+            epic: self.epic,
+            expiry: self.expiry,
+            guaranteed_stop: self.guaranteed_stop,
+            order_type: self.order_type,
+            size: Set(s),
+            force_open: self.force_open,
             level: self.level,
             limit_distance: self.limit_distance,
             limit_level: self.limit_level,
@@ -173,227 +407,78 @@ impl Inner {
 }
 
 // ---------------------------------------------------------------------------
-// Builder
+// Optional setters (available on any builder state)
 // ---------------------------------------------------------------------------
 
-/// Builder for `POST /positions/otc`.
-///
-/// Obtain via [`PositionsApi::open`]. Set all mandatory fields and call
-/// `.guaranteed_stop(bool)` to transition to [`WithMandatories`], then
-/// optionally set additional fields and call `.send()`.
-pub struct OpenPositionBuilder<'a, State> {
-    pub(super) api: &'a PositionsApi<'a>,
-    inner: Inner,
-    _state: std::marker::PhantomData<State>,
-}
-
-impl<'a> OpenPositionBuilder<'a, MissingMandatory> {
-    pub(super) fn new(api: &'a PositionsApi<'a>) -> Self {
-        Self {
-            api,
-            inner: Inner::new(),
-            _state: std::marker::PhantomData,
-        }
-    }
-
-    /// Set the ISO-4217 currency code.
-    pub fn currency(mut self, c: impl Into<Currency>) -> Self {
-        self.inner.currency_code = Some(c.into());
-        self
-    }
-
-    /// Set the trade direction.
-    pub fn direction(mut self, d: Direction) -> Self {
-        self.inner.direction = Some(d);
-        self
-    }
-
-    /// Set the instrument epic.
-    pub fn epic(mut self, e: impl Into<Epic>) -> Self {
-        self.inner.epic = Some(e.into());
-        self
-    }
-
-    /// Set the instrument expiry (`"DFB"`, `"-"`, or a date string).
-    pub fn expiry(mut self, e: impl Into<String>) -> Self {
-        self.inner.expiry = Some(e.into());
-        self
-    }
-
+impl<CC, Di, E, X, G, O, Si>
+    OpenPositionBuilder<'_, CC, Di, E, X, G, O, Si>
+{
     /// Override `force_open` (defaults to `false`).
     pub fn force_open(mut self, fo: bool) -> Self {
-        self.inner.force_open = fo;
+        self.force_open = fo;
         self
     }
 
-    /// Set the order type.
-    pub fn order_type(mut self, ot: OrderType) -> Self {
-        self.inner.order_type = Some(ot);
-        self
-    }
-
-    /// Set the position size.
-    pub fn size(mut self, s: f64) -> Self {
-        self.inner.size = Some(s);
-        self
-    }
-
-    // --- optional setters callable while still in MissingMandatory ---
-
-    /// Set the entry level (required for `LIMIT` / `QUOTE` order types).
+    /// Set the entry level (required at runtime for `LIMIT` / `QUOTE` order types).
     pub fn level(mut self, l: f64) -> Self {
-        self.inner.level = Some(l);
+        self.level = Some(l);
         self
     }
 
     /// Set a limit as distance from the opening level.
     pub fn with_limit_distance(mut self, d: f64) -> Self {
-        self.inner.limit_distance = Some(d);
+        self.limit_distance = Some(d);
         self
     }
 
     /// Set a limit as an absolute level.
     pub fn with_limit_level(mut self, l: f64) -> Self {
-        self.inner.limit_level = Some(l);
+        self.limit_level = Some(l);
         self
     }
 
     /// Set a stop as distance from the opening level.
     pub fn with_stop_distance(mut self, d: f64) -> Self {
-        self.inner.stop_distance = Some(d);
+        self.stop_distance = Some(d);
         self
     }
 
     /// Set a stop as an absolute level.
     pub fn with_stop_level(mut self, l: f64) -> Self {
-        self.inner.stop_level = Some(l);
+        self.stop_level = Some(l);
         self
     }
 
     /// Enable/disable trailing stop.
     pub fn trailing_stop(mut self, ts: bool) -> Self {
-        self.inner.trailing_stop = Some(ts);
+        self.trailing_stop = Some(ts);
         self
     }
 
     /// Set trailing stop increment.
     pub fn trailing_stop_increment(mut self, tsi: f64) -> Self {
-        self.inner.trailing_stop_increment = Some(tsi);
+        self.trailing_stop_increment = Some(tsi);
         self
     }
 
     /// Set the time-in-force policy.
     pub fn time_in_force(mut self, tif: TimeInForce) -> Self {
-        self.inner.time_in_force = Some(tif);
+        self.time_in_force = Some(tif);
         self
     }
 
-    /// Set the quote ID (required for `QUOTE` order type).
+    /// Set the quote ID (required at runtime for `QUOTE` order type).
     pub fn quote_id(mut self, qid: impl Into<String>) -> Self {
-        self.inner.quote_id = Some(qid.into());
+        self.quote_id = Some(qid.into());
         self
-    }
-
-    /// Set whether the stop is guaranteed. **This is the final mandatory
-    /// setter.** Transitions to [`WithMandatories`] after validating that
-    /// all other mandatory fields (`epic`, `direction`, `size`, `order_type`,
-    /// `currency`, `expiry`) have been set.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(Error::InvalidInput)` if any other mandatory field is
-    /// missing. All other setters are infallible — errors are deferred here.
-    pub fn guaranteed_stop(
-        mut self,
-        gs: bool,
-    ) -> std::result::Result<OpenPositionBuilder<'a, WithMandatories>, Error> {
-        self.inner.guaranteed_stop = Some(gs);
-        self.try_send_ready()
-    }
-
-    /// Explicitly attempt to transition to [`WithMandatories`].
-    ///
-    /// Returns an error if any mandatory field is still unset. Use this when
-    /// you've set `guaranteed_stop` via a different setter path or want
-    /// explicit error handling before the state transition.
-    pub fn try_send_ready(
-        self,
-    ) -> std::result::Result<OpenPositionBuilder<'a, WithMandatories>, Error> {
-        if self.inner.all_mandatories_set() {
-            Ok(OpenPositionBuilder {
-                api: self.api,
-                inner: self.inner,
-                _state: std::marker::PhantomData,
-            })
-        } else {
-            Err(Error::InvalidInput(
-                "not all mandatory fields set on OpenPositionBuilder \
-                 (required: epic, direction, size, order_type, currency, expiry, guaranteed_stop)"
-                    .into(),
-            ))
-        }
     }
 }
 
 // ---------------------------------------------------------------------------
-// WithMandatories — optional setters + send
+// `.send()` — only available on the fully-specified builder
 // ---------------------------------------------------------------------------
 
-impl OpenPositionBuilder<'_, WithMandatories> {
-    /// Set the entry level (required for `LIMIT` / `QUOTE` order types).
-    pub fn level(mut self, l: f64) -> Self {
-        self.inner.level = Some(l);
-        self
-    }
-
-    /// Set a limit as distance from the opening level.
-    pub fn with_limit_distance(mut self, d: f64) -> Self {
-        self.inner.limit_distance = Some(d);
-        self
-    }
-
-    /// Set a limit as an absolute level.
-    pub fn with_limit_level(mut self, l: f64) -> Self {
-        self.inner.limit_level = Some(l);
-        self
-    }
-
-    /// Set a stop as distance from the opening level.
-    pub fn with_stop_distance(mut self, d: f64) -> Self {
-        self.inner.stop_distance = Some(d);
-        self
-    }
-
-    /// Set a stop as an absolute level.
-    pub fn with_stop_level(mut self, l: f64) -> Self {
-        self.inner.stop_level = Some(l);
-        self
-    }
-
-    /// Enable/disable trailing stop.
-    pub fn trailing_stop(mut self, ts: bool) -> Self {
-        self.inner.trailing_stop = Some(ts);
-        self
-    }
-
-    /// Set trailing stop increment.
-    pub fn trailing_stop_increment(mut self, tsi: f64) -> Self {
-        self.inner.trailing_stop_increment = Some(tsi);
-        self
-    }
-
-    /// Set the time-in-force policy.
-    pub fn time_in_force(mut self, tif: TimeInForce) -> Self {
-        self.inner.time_in_force = Some(tif);
-        self
-    }
-
-    /// Set the quote ID (required for `QUOTE` order type).
-    pub fn quote_id(mut self, qid: impl Into<String>) -> Self {
-        self.inner.quote_id = Some(qid.into());
-        self
-    }
-
+impl ReadyOpenPositionBuilder<'_> {
     /// Send the open-position request.
     ///
     /// Steps:
@@ -408,7 +493,25 @@ impl OpenPositionBuilder<'_, WithMandatories> {
     #[instrument(skip_all, name = "dealing.positions.open")]
     pub async fn send(self) -> Result<DealConfirmation> {
         let api = self.api;
-        let body = self.inner.into_body();
+        let body = OpenPositionBody {
+            currency_code: self.currency_code.0,
+            direction: self.direction.0,
+            epic: self.epic.0,
+            expiry: self.expiry.0,
+            force_open: self.force_open,
+            guaranteed_stop: self.guaranteed_stop.0,
+            order_type: self.order_type.0,
+            size: self.size.0,
+            level: self.level,
+            limit_distance: self.limit_distance,
+            limit_level: self.limit_level,
+            stop_distance: self.stop_distance,
+            stop_level: self.stop_level,
+            trailing_stop: self.trailing_stop,
+            trailing_stop_increment: self.trailing_stop_increment,
+            time_in_force: self.time_in_force,
+            quote_id: self.quote_id,
+        };
 
         let resp: OpenPositionResponse = api
             .client
@@ -423,20 +526,5 @@ impl OpenPositionBuilder<'_, WithMandatories> {
             .await?;
 
         api.confirm(&resp.deal_reference).await
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Debug impl
-// ---------------------------------------------------------------------------
-
-impl<State> std::fmt::Debug for OpenPositionBuilder<'_, State> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OpenPositionBuilder")
-            .field("epic", &self.inner.epic)
-            .field("direction", &self.inner.direction)
-            .field("size", &self.inner.size)
-            .field("order_type", &self.inner.order_type)
-            .finish()
     }
 }

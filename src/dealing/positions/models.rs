@@ -3,32 +3,10 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::models::common::{DealId, DealReference, Direction, Epic, OrderType, TimeInForce};
+// DealConfirmation and DealStatus are re-exported from dealing::positions via dealing::common.
+use crate::models::common::{DealId, DealReference, Direction, Epic, MarketSnapshot, OrderType, TimeInForce};
 
-// ---------------------------------------------------------------------------
-// Market snapshot (embedded in every position entry)
-// ---------------------------------------------------------------------------
-
-/// A snapshot of market data returned as part of a position response.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MarketSnapshot {
-    pub epic: Epic,
-    pub expiry: String,
-    pub instrument_name: String,
-    pub instrument_type: String,
-    pub lot_size: f64,
-    pub market_status: String,
-    pub scaling_factor: f64,
-    pub bid: Option<f64>,
-    pub offer: Option<f64>,
-    pub update_time: Option<String>,
-    pub update_time_utc: Option<String>,
-    pub percentage_change: Option<f64>,
-    pub net_change: Option<f64>,
-    pub high: Option<f64>,
-    pub low: Option<f64>,
-}
+// MarketSnapshot is defined in models::common (unified across all domains).
 
 // ---------------------------------------------------------------------------
 // V1 position
@@ -209,46 +187,8 @@ impl PositionsEnvelopeV2 {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Deal confirmation
-// ---------------------------------------------------------------------------
-
-/// Outcome status of a deal confirmation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum DealStatus {
-    Accepted,
-    Rejected,
-    Unknown,
-}
-
-/// Full confirmation of a deal after open, update, or close.
-///
-/// Returned by `GET /confirms/{dealReference}` (v1).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DealConfirmation {
-    pub deal_reference: DealReference,
-    pub deal_id: Option<DealId>,
-    pub deal_status: DealStatus,
-    /// Populated when `deal_status` is `Rejected`.
-    pub reason: Option<String>,
-    pub direction: Option<Direction>,
-    pub epic: Option<Epic>,
-    pub expiry: Option<String>,
-    pub level: Option<f64>,
-    pub size: Option<f64>,
-    pub limit_level: Option<f64>,
-    pub stop_level: Option<f64>,
-    pub order_type: Option<OrderType>,
-    pub status: Option<String>,
-    pub guaranteed_stop: Option<bool>,
-    pub trailing_stop: Option<bool>,
-    pub profit: Option<f64>,
-    pub profit_currency: Option<String>,
-    pub date: Option<String>,
-    pub affected_deals: Option<Vec<serde_json::Value>>,
-}
+// DealStatus and DealConfirmation are defined in dealing::common.
+// They are re-exported from positions::mod for backwards compatibility.
 
 // ---------------------------------------------------------------------------
 // Update position request

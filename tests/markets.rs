@@ -193,7 +193,7 @@ async fn get_many_snapshot_only_filter() {
         .expect("get_many snapshot_only ok");
 
     assert_eq!(details.len(), 1);
-    assert_eq!(details[0].snapshot.scaling_factor, 1);
+    assert_eq!(details[0].snapshot.scaling_factor, Some(1));
 }
 
 #[tokio::test]
@@ -246,7 +246,7 @@ async fn get_single_market_returns_details() {
     assert_eq!(details.instrument.currencies.len(), 2);
     assert!(details.instrument.currencies[0].is_default);
     assert!((details.snapshot.bid.unwrap() - 1.2700).abs() < 1e-6);
-    assert!((details.snapshot.controlled_risk_extra_spread - 0.8).abs() < 1e-6);
+    assert!((details.snapshot.controlled_risk_extra_spread.unwrap_or(0.0) - 0.8).abs() < 1e-6);
 }
 
 #[tokio::test]

@@ -6,6 +6,7 @@ mod support;
 
 use support::mock_server::IgMockServer;
 use trading_ig::watchlists::{CreateWatchlistRequest, CreateWatchlistStatus};
+use trading_ig::markets::models::MarketStatus;
 use trading_ig::models::common::Epic;
 
 // ---------------------------------------------------------------------------
@@ -64,7 +65,7 @@ async fn markets_in_watchlist_golden() {
     let gbp = &markets[0];
     assert_eq!(gbp.epic.as_str(), "CS.D.GBPUSD.TODAY.IP");
     assert_eq!(gbp.instrument_name, "GBP/USD");
-    assert_eq!(gbp.market_status, "TRADEABLE");
+    assert_eq!(gbp.market_status, MarketStatus::Tradeable);
     assert!(gbp.streaming_prices_available);
     assert!((gbp.bid.unwrap() - 1.265_f64).abs() < 1e-9);
 
@@ -277,7 +278,7 @@ async fn markets_with_null_prices() {
     assert_eq!(markets.len(), 1);
     let m = &markets[0];
     assert_eq!(m.epic.as_str(), "IX.D.DAX.DAILY.IP");
-    assert_eq!(m.market_status, "CLOSED");
+    assert_eq!(m.market_status, MarketStatus::Closed);
     assert!(m.bid.is_none());
     assert!(m.offer.is_none());
     assert!(!m.streaming_prices_available);

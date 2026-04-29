@@ -118,6 +118,110 @@ pub enum TimeInForce {
     FillOrKill,
 }
 
+/// IG instrument classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum InstrumentType {
+    Currencies,
+    Shares,
+    Indices,
+    Commodities,
+    Options,
+    Bonds,
+    Rates,
+    Sectors,
+    Funds,
+    SprintMarkets,
+    #[serde(other)]
+    Unknown,
+}
+
+/// Current trading status of a market.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MarketStatus {
+    /// Market is open and tradeable.
+    Tradeable,
+    /// Edits (stop / limit moves) are allowed but new deals are not.
+    EditsOnly,
+    /// Market is closed for trading.
+    Closed,
+    /// Market is offline (e.g. weekend).
+    Offline,
+    /// Auction is in progress.
+    OnAuction,
+    /// Pre-market auction state.
+    OnAuctionNoEdits,
+    /// Suspended from trading.
+    Suspended,
+    #[serde(other)]
+    Unknown,
+}
+
+fn default_market_status() -> MarketStatus { MarketStatus::Unknown }
+
+/// Unified market snapshot — used by the markets endpoint (as the `snapshot`
+/// sub-object) and by the dealing endpoints (as the embedded `market` /
+/// `marketData` sub-object).
+///
+/// Fields that are only present on one endpoint family are `Option`al and
+/// default to `None` when absent from the JSON.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketSnapshot {
+    // ── Identity (dealing endpoints only; absent in markets/snapshot) ──────
+    /// IG market identifier.
+    #[serde(default)]
+    pub epic: Option<Epic>,
+    /// Human-readable instrument name.
+    #[serde(default)]
+    pub instrument_name: Option<String>,
+    /// Expiry code (e.g. `"DFB"`, `"Dec-24"`).
+    #[serde(default)]
+    pub expiry: Option<String>,
+    /// Instrument type as a raw string (dealing endpoints; enum in markets).
+    #[serde(default)]
+    pub instrument_type: Option<String>,
+    /// Contract lot size (positions endpoint only).
+    #[serde(default)]
+    pub lot_size: Option<f64>,
+
+    // ── Price data ──────────────────────────────────────────────────────────
+    /// Current bid price.
+    pub bid: Option<f64>,
+    /// Current offer / ask price.
+    pub offer: Option<f64>,
+    /// Today's high price.
+    pub high: Option<f64>,
+    /// Today's low price.
+    pub low: Option<f64>,
+    /// Percentage price change today.
+    pub percentage_change: Option<f64>,
+    /// Absolute net price change today.
+    pub net_change: Option<f64>,
+    /// Price update timestamp (local exchange time).
+    pub update_time: Option<String>,
+    /// Price update timestamp (UTC).
+    pub update_time_utc: Option<String>,
+
+    // ── Status ──────────────────────────────────────────────────────────────
+    /// Current market trading status.
+    #[serde(default = "default_market_status")]
+    pub market_status: MarketStatus,
+
+    // ── Markets-endpoint-specific ───────────────────────────────────────────
+    /// Price delay in minutes (0 = real-time).
+    pub delay_time: Option<i32>,
+    /// Binary odds (binary instruments only).
+    pub binary_odds: Option<f64>,
+    /// Number of decimal places in prices.
+    pub decimal_places_factor: Option<i32>,
+    /// Scaling factor applied to prices.
+    pub scaling_factor: Option<i32>,
+    /// Extra spread charged for controlled-risk orders.
+    pub controlled_risk_extra_spread: Option<f64>,
+}
+
 impl FromStr for Direction {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Error> {

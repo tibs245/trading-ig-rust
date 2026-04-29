@@ -4,11 +4,12 @@ use http::Method;
 use tracing::instrument;
 
 use crate::client::IgClient;
+use crate::dealing::common::DealConfirmation;
 use crate::dealing::positions::models::{
-    ClosePositionRequest, ClosePositionResponse, DealConfirmation, PositionV1, PositionV2,
+    ClosePositionRequest, ClosePositionResponse, PositionV1, PositionV2,
     PositionsEnvelopeV1, PositionsEnvelopeV2, UpdatePositionRequest, UpdatePositionResponse,
 };
-use crate::dealing::positions::open_position::{MissingMandatory, OpenPositionBuilder};
+use crate::dealing::positions::open_position::{Missing, OpenPositionBuilder};
 use crate::error::Result;
 use crate::models::common::DealReference;
 
@@ -103,13 +104,25 @@ impl<'a> PositionsApi<'a> {
 
     /// Begin constructing an open-position request.
     ///
-    /// Returns an [`OpenPositionBuilder`] in the `MissingMandatory` state.
-    /// Call all mandatory setters (`epic`, `direction`, `size`, `order_type`,
-    /// `currency`, `expiry`, `guaranteed_stop`) before calling `.send()`.
+    /// Returns an [`OpenPositionBuilder`] with all mandatory fields unset.
+    /// Supply all mandatory fields (`currency`, `direction`, `epic`, `expiry`,
+    /// `guaranteed_stop`, `order_type`, `size` — in any order) before calling
+    /// `.send()`. The compiler enforces this at compile time.
     ///
     /// `POST /positions/otc` with `Version: 2`, followed by auto-fetching
     /// `GET /confirms/{dealReference}`.
-    pub fn open(&'a self) -> OpenPositionBuilder<'a, MissingMandatory> {
+    pub fn open(
+        &'a self,
+    ) -> OpenPositionBuilder<
+        'a,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+        Missing,
+    > {
         OpenPositionBuilder::new(self)
     }
 

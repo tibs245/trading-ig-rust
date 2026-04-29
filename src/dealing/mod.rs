@@ -2,8 +2,11 @@
 //!
 //! Entry point: [`DealingApi`], obtained via `client.dealing()`.
 
+pub mod common;
 pub mod positions;
 pub mod working_orders;
+
+pub use common::{DealConfirmation, DealStatus};
 
 use crate::client::IgClient;
 use positions::PositionsApi;

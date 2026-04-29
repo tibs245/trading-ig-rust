@@ -9,7 +9,9 @@ pub(super) mod open_position;
 
 pub use api::PositionsApi;
 pub use models::{
-    ClosePositionRequest, DealConfirmation, DealStatus, MarketSnapshot, PositionV1, PositionV2,
+    ClosePositionRequest, PositionV1, PositionV2,
     UpdatePositionRequest,
 };
-pub use open_position::{MissingMandatory, OpenPositionBuilder, WithMandatories};
+pub use crate::dealing::common::{DealConfirmation, DealStatus};
+pub use crate::models::common::MarketSnapshot;
+pub use open_position::{Missing, OpenPositionBuilder, ReadyOpenPositionBuilder, Set};

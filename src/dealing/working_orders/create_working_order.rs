@@ -30,7 +30,7 @@ use serde::Serialize;
 use std::time::Duration;
 use tracing::warn;
 
-use crate::dealing::working_orders::models::DealConfirmation;
+use crate::dealing::common::DealConfirmation;
 use crate::error::Result;
 use crate::models::common::{Currency, DealReference, Direction, Epic, OrderType, TimeInForce};
 
