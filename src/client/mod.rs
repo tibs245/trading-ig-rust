@@ -24,6 +24,7 @@ pub use builder::IgClientBuilder;
 use std::sync::Arc;
 
 use crate::config::IgConfig;
+use crate::dealing::DealingApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
 use http::Transport;
@@ -46,6 +47,11 @@ impl IgClient {
     /// Read-only access to the resolved configuration.
     pub fn config(&self) -> &IgConfig {
         &self.config
+    }
+
+    /// Dealing API: positions, working orders.
+    pub fn dealing(&self) -> DealingApi<'_> {
+        DealingApi::new(self)
     }
 
     /// Session API: login, refresh, switch account, logout.

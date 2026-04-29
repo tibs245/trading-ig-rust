@@ -1,0 +1,66 @@
+{
+  "positions": [
+    {
+      "position": {
+        "contractSize": 1,
+        "controlledRisk": false,
+        "createdDate": "2024/01/15 09:30:00",
+        "createdDateUTC": "2024-01-15T09:30:00",
+        "dealId": "DIAAAABBBCCC02",
+        "dealReference": "ref-v2-001",
+        "direction": "BUY",
+        "level": 1.2345,
+        "limitLevel": null,
+        "size": 1.0,
+        "stopLevel": null,
+        "trailingStep": null,
+        "trailingStopDistance": null,
+        "currency": "GBP"
+      },
+      "market": {
+        "bid": 1.234,
+        "offer": 1.235,
+        "epic": "CS.D.GBPUSD.TODAY.IP",
+        "expiry": "DFB",
+        "instrumentName": "GBP/USD",
+        "instrumentType": "CURRENCIES",
+        "lotSize": 1,
+        "marketStatus": "TRADEABLE",
+        "scalingFactor": 10000,
+        "updateTime": "09:30:00",
+        "updateTimeUTC": "09:30:00"
+      }
+    },
+    {
+      "position": {
+        "contractSize": 1,
+        "controlledRisk": true,
+        "createdDate": "2024/01/16 11:00:00",
+        "createdDateUTC": null,
+        "dealId": "DIAAAABBBCCC03",
+        "dealReference": "ref-v2-002",
+        "direction": "SELL",
+        "level": 19500.0,
+        "limitLevel": null,
+        "size": 2.0,
+        "stopLevel": 19550.0,
+        "trailingStep": null,
+        "trailingStopDistance": null,
+        "currency": "USD"
+      },
+      "market": {
+        "bid": 19490.0,
+        "offer": 19510.0,
+        "epic": "IX.D.FTSE.DAILY.IP",
+        "expiry": "DFB",
+        "instrumentName": "FTSE 100",
+        "instrumentType": "INDICES",
+        "lotSize": 1,
+        "marketStatus": "TRADEABLE",
+        "scalingFactor": 1,
+        "updateTime": "11:00:00",
+        "updateTimeUTC": null
+      }
+    }
+  ]
+}

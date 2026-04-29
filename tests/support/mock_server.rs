@@ -36,6 +36,11 @@ impl IgMockServer {
         Url::parse(&self.server.uri()).expect("wiremock returns a valid URL")
     }
 
+    /// Access the underlying `wiremock::MockServer` for advanced mock setup.
+    pub fn server(&self) -> &MockServer {
+        &self.server
+    }
+
     /// Build an [`IgClient`] pointing at this mock, with sensible defaults.
     pub fn client(&self) -> IgClient {
         IgClient::builder()
@@ -92,6 +97,57 @@ impl IgMockServer {
                     .insert_header("Content-Type", "application/json; charset=UTF-8")
                     .insert_header("CST", "demo-cst-token")
                     .insert_header("X-SECURITY-TOKEN", "demo-xst-token")
+                    .set_body_string(body),
+            )
+            .mount(&self.server)
+            .await;
+        self
+    }
+
+    /// Mount a fixture-backed response for an authenticated POST.
+    pub async fn mount_post(&self, path_str: &str, version: u8, fixture: &str) -> &Self {
+        let body = fixtures::load(fixture);
+        Mock::given(method("POST"))
+            .and(path(path_str))
+            .and(HasApiKey)
+            .and(HasVersion(version))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Content-Type", "application/json; charset=UTF-8")
+                    .set_body_string(body),
+            )
+            .mount(&self.server)
+            .await;
+        self
+    }
+
+    /// Mount a fixture-backed response for an authenticated PUT.
+    pub async fn mount_put(&self, path_str: &str, version: u8, fixture: &str) -> &Self {
+        let body = fixtures::load(fixture);
+        Mock::given(method("PUT"))
+            .and(path(path_str))
+            .and(HasApiKey)
+            .and(HasVersion(version))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Content-Type", "application/json; charset=UTF-8")
+                    .set_body_string(body),
+            )
+            .mount(&self.server)
+            .await;
+        self
+    }
+
+    /// Mount a fixture-backed response for an authenticated DELETE.
+    pub async fn mount_delete(&self, path_str: &str, version: u8, fixture: &str) -> &Self {
+        let body = fixtures::load(fixture);
+        Mock::given(method("DELETE"))
+            .and(path(path_str))
+            .and(HasApiKey)
+            .and(HasVersion(version))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Content-Type", "application/json; charset=UTF-8")
                     .set_body_string(body),
             )
             .mount(&self.server)
