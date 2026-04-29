@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# pre-commit hook: fast checks before letting a commit through.
+# Activate once after cloning with: `git config core.hooksPath .githooks`
+#
+# Skip with: `git commit --no-verify` (use sparingly).
+
+set -euo pipefail
+
+# Only run on files actually staged for commit. Pure-doc / fixture-only
+# changes don't need clippy.
+staged_rust=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.rs$' || true)
+staged_toml=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(Cargo\.toml|Cargo\.lock)$' || true)
+
+if [[ -z "$staged_rust" && -z "$staged_toml" ]]; then
+  echo "pre-commit: no Rust / Cargo files staged — skipping checks"
+  exit 0
+fi
+
+echo "pre-commit: cargo fmt --all -- --check"
+cargo fmt --all -- --check
+
+echo "pre-commit: cargo clippy --all-targets --all-features --no-deps -- -D warnings"
+cargo clippy --all-targets --all-features --no-deps -- -D warnings
+
+echo "pre-commit: OK"

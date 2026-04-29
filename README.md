@@ -154,6 +154,26 @@ IG_API_KEY=your-key IG_USERNAME=you IG_PASSWORD=secret IG_LIVE_TRADING_OK=1 \
 If `IG_API_KEY` is absent the whole suite skips gracefully, so
 `cargo test --all-features` in CI passes without hitting the network.
 
+## Contributing
+
+After cloning, opt into the project's git hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This enables:
+
+- **pre-commit** — runs `cargo fmt --check` and `cargo clippy --all-targets
+  --all-features --no-deps -- -D warnings` on commits that touch Rust or
+  Cargo files. Skipped for doc-only / fixture-only commits.
+- **pre-push** — runs `cargo test --all-targets --all-features` before
+  pushing to a remote.
+
+Skip a check if you really need to: `git commit --no-verify` /
+`git push --no-verify`. The CI workflow runs the same checks regardless,
+so anything you bypass locally will fail in PR.
+
 ## Project knowledge
 
 Internal conventions, architecture decisions, and the IG API spec live

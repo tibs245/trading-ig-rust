@@ -21,6 +21,7 @@ exclude = [
     ".github/**",
     ".cargo/**",
     ".gitignore",
+    ".githooks/**",
     "deny.toml",
 ]
 

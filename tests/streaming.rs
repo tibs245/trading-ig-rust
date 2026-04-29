@@ -193,7 +193,7 @@ fn auto_reconnect_disabled_policy_compiles() {
         enabled: false,
         max_attempts: None,
         initial_backoff: Duration::from_millis(500),
-        max_backoff: Duration::from_secs(60),
+        max_backoff: Duration::from_mins(1),
         backoff_multiplier: 1.5,
     };
     assert!(!policy.enabled);

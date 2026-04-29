@@ -25,7 +25,7 @@ use std::time::Duration;
 ///     enabled: true,
 ///     max_attempts: Some(3),
 ///     initial_backoff: Duration::from_secs(2),
-///     max_backoff: Duration::from_secs(60),
+///     max_backoff: Duration::from_mins(1),
 ///     backoff_multiplier: 2.0,
 /// };
 /// ```
