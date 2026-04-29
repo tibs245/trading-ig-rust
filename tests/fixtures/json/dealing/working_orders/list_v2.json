@@ -1,0 +1,41 @@
+{
+  "workingOrders": [
+    {
+      "workingOrderData": {
+        "dealId": "DIAAAAA222222222",
+        "direction": "SELL",
+        "epic": "CS.D.EURUSD.TODAY.IP",
+        "orderSize": 2.5,
+        "orderLevel": 1.0850,
+        "orderType": "LIMIT",
+        "currencyCode": "EUR",
+        "guaranteedStop": false,
+        "dma": false,
+        "goodTillDate": null,
+        "goodTillDateIso": null,
+        "limitDistance": 15.0,
+        "limitLevel": null,
+        "stopDistance": 25.0,
+        "stopLevel": null,
+        "timeInForce": "GOOD_TILL_CANCELLED",
+        "createdDate": "2025/04/10 10:00:00",
+        "createdDateUtc": "2025-04-10T10:00:00"
+      },
+      "marketData": {
+        "epic": "CS.D.EURUSD.TODAY.IP",
+        "instrumentName": "EUR/USD",
+        "expiry": "DFB",
+        "bid": 1.0845,
+        "offer": 1.0855,
+        "high": 1.0900,
+        "low": 1.0820,
+        "percentageChange": -0.05,
+        "netChange": -0.0005,
+        "marketStatus": "TRADEABLE",
+        "updateTime": "10:05:00",
+        "updateTimeUtc": "2025-04-10T10:05:00",
+        "scalingFactor": 10000
+      }
+    }
+  ]
+}

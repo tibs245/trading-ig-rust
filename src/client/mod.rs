@@ -24,6 +24,7 @@ pub use builder::IgClientBuilder;
 use std::sync::Arc;
 
 use crate::config::IgConfig;
+use crate::dealing::DealingApi;
 use crate::session::{Credentials, SessionApi, SessionHandle, SharedSession};
 
 use http::Transport;
@@ -57,5 +58,10 @@ impl IgClient {
                 credentials: self.credentials.clone(),
             },
         }
+    }
+
+    /// Dealing API: working orders (and positions post-merge).
+    pub fn dealing(&self) -> DealingApi<'_> {
+        DealingApi { client: self }
     }
 }

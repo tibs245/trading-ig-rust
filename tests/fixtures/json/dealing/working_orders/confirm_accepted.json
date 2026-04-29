@@ -1,0 +1,22 @@
+{
+  "dealId": "DIBBBBBB111111111",
+  "dealReference": "WO-REF-ABCDEF123456",
+  "dealStatus": "ACCEPTED",
+  "status": "OPEN",
+  "reason": "SUCCESS",
+  "epic": "CS.D.GBPUSD.TODAY.IP",
+  "direction": "BUY",
+  "level": 1.2345,
+  "size": 1.0,
+  "currency": "GBP",
+  "guaranteedStop": false,
+  "stopLevel": null,
+  "stopDistance": 20.0,
+  "limitLevel": null,
+  "limitDistance": 10.0,
+  "goodTillDate": null,
+  "goodTillDateIso": null,
+  "timeInForce": "GOOD_TILL_CANCELLED",
+  "orderType": "LIMIT",
+  "date": "2025/04/10 10:00:00"
+}

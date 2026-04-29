@@ -1,0 +1,22 @@
+{
+  "dealId": "DIAAAAA222222222",
+  "dealReference": "WO-REF-UPDATE-111",
+  "dealStatus": "ACCEPTED",
+  "status": "AMENDED",
+  "reason": "SUCCESS",
+  "epic": "CS.D.EURUSD.TODAY.IP",
+  "direction": "SELL",
+  "level": 1.0900,
+  "size": 2.5,
+  "currency": "EUR",
+  "guaranteedStop": false,
+  "stopLevel": null,
+  "stopDistance": 30.0,
+  "limitLevel": null,
+  "limitDistance": 20.0,
+  "goodTillDate": null,
+  "goodTillDateIso": null,
+  "timeInForce": "GOOD_TILL_CANCELLED",
+  "orderType": "LIMIT",
+  "date": "2025/04/10 11:00:00"
+}
