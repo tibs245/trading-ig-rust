@@ -1,0 +1,45 @@
+{
+  "workingOrders": [
+    {
+      "workingOrderData": {
+        "dealId": "DIAAAAA111111111",
+        "direction": "BUY",
+        "epic": "CS.D.GBPUSD.TODAY.IP",
+        "orderSize": 1.0,
+        "orderLevel": 1.2345,
+        "orderType": "LIMIT",
+        "goodTill": "2026-01-01",
+        "controlledRisk": false,
+        "currencyCode": "GBP",
+        "dma": false,
+        "createdDate": "2025:04:01-09:00:00",
+        "createdDateUtc": "2025-04-01T09:00:00",
+        "limitDistance": 10.0,
+        "stopDistance": 20.0,
+        "timeInForce": "GOOD_TILL_DATE",
+        "contingentLimit": null,
+        "contingentStop": null,
+        "trailingStopDistance": null,
+        "trailingStopIncrement": null,
+        "trailingTriggerDistance": null,
+        "trailingTriggerIncrement": null,
+        "requestType": "WORKING_ORDER_REQUEST"
+      },
+      "marketData": {
+        "epic": "CS.D.GBPUSD.TODAY.IP",
+        "instrumentName": "GBP/USD",
+        "expiry": "DFB",
+        "bid": 1.2340,
+        "offer": 1.2350,
+        "high": 1.2400,
+        "low": 1.2300,
+        "percentageChange": 0.12,
+        "netChange": 0.0015,
+        "marketStatus": "TRADEABLE",
+        "updateTime": "09:30:00",
+        "updateTimeUtc": "2025-04-01T09:30:00",
+        "scalingFactor": 10000
+      }
+    }
+  ]
+}

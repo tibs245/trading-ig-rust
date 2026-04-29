@@ -1,0 +1,22 @@
+{
+  "dealId": "DIAAAAA333333333",
+  "dealReference": "WO-REF-DELETE-999",
+  "dealStatus": "ACCEPTED",
+  "status": "DELETED",
+  "reason": "SUCCESS",
+  "epic": "CS.D.GBPUSD.TODAY.IP",
+  "direction": "BUY",
+  "level": 1.2345,
+  "size": 1.0,
+  "currency": "GBP",
+  "guaranteedStop": false,
+  "stopLevel": null,
+  "stopDistance": null,
+  "limitLevel": null,
+  "limitDistance": null,
+  "goodTillDate": null,
+  "goodTillDateIso": null,
+  "timeInForce": "GOOD_TILL_CANCELLED",
+  "orderType": "LIMIT",
+  "date": "2025/04/10 12:00:00"
+}

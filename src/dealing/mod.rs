@@ -3,16 +3,18 @@
 //! Entry point: [`DealingApi`], obtained via `client.dealing()`.
 
 pub mod positions;
+pub mod working_orders;
 
 use crate::client::IgClient;
 use positions::PositionsApi;
+use working_orders::WorkingOrdersApi;
 
 /// Typed accessor for all dealing endpoints.
 ///
 /// Obtain via [`crate::IgClient::dealing`].
 #[derive(Debug)]
 pub struct DealingApi<'a> {
-    client: &'a IgClient,
+    pub(crate) client: &'a IgClient,
 }
 
 impl<'a> DealingApi<'a> {
@@ -25,5 +27,10 @@ impl<'a> DealingApi<'a> {
         PositionsApi {
             client: self.client,
         }
+    }
+
+    /// Access working-order endpoints.
+    pub fn working_orders(&self) -> WorkingOrdersApi<'a> {
+        WorkingOrdersApi { client: self.client }
     }
 }
