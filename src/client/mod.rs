@@ -23,6 +23,7 @@ pub use builder::IgClientBuilder;
 
 use std::sync::Arc;
 
+use crate::accounts::AccountsApi;
 use crate::client_sentiment::ClientSentimentApi;
 use crate::config::IgConfig;
 use crate::history::HistoryApi;
@@ -52,6 +53,11 @@ impl IgClient {
     /// Read-only access to the resolved configuration.
     pub fn config(&self) -> &IgConfig {
         &self.config
+    }
+
+    /// Accounts API: list accounts and manage preferences.
+    pub fn accounts(&self) -> AccountsApi<'_> {
+        AccountsApi { client: self }
     }
 
     /// Client sentiment API: long/short percentages for IG markets.
