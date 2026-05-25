@@ -159,10 +159,17 @@ pub fn parse_line(line: &[u8]) -> Frame {
         return Frame::End { cause };
     }
 
-    // --- Update line: "<item_index>|<f1>|<f2>|..." ---
+    // --- Update line: "<table>,<item>|<f1>|<f2>|..." (TLCP streaming form)
+    //     or the bare "<item_index>|<f1>|..." form. The leading key is
+    //     "<table>,<itemPos>"; we subscribe one item per table (LS_table =
+    //     the registry index), so the routing key is the TABLE — the number
+    //     before the comma. Parsing the whole "1,1" as a usize fails on the
+    //     comma, which silently dropped EVERY update as `Unknown` (no ticks
+    //     ever delivered despite data arriving).
     if let Some(pipe_pos) = s.find('|') {
         let index_str = &s[..pipe_pos];
-        if let Ok(item_index) = index_str.parse::<usize>() {
+        let table_str = index_str.split(',').next().unwrap_or(index_str);
+        if let Ok(item_index) = table_str.parse::<usize>() {
             let fields_str = &s[pipe_pos + 1..];
             let fields = fields_str.split('|').map(decode_field).collect();
             return Frame::Update { item_index, fields };
@@ -326,6 +333,28 @@ mod tests {
                 ]
             }
         );
+    }
+
+    #[test]
+    fn test_table_item_update_key() {
+        // TLCP streaming sends "<table>,<itemPos>|fields". The routing key is
+        // the TABLE (before the comma) = the LS_table we subscribed with.
+        // Regression: parsing "1,1" as a whole usize failed → every update was
+        // dropped as Unknown → zero ticks delivered despite data arriving.
+        let f = parse_line(b"1,1|100.5|101.0");
+        assert_eq!(
+            f,
+            Frame::Update {
+                item_index: 1,
+                fields: vec![
+                    FieldValue::Value("100.5".into()),
+                    FieldValue::Value("101.0".into()),
+                ]
+            }
+        );
+        // A real IG chart-tick line (table 2) routes by its table.
+        let real = parse_line(b"2,1|1.16458|1.16468|#|1|#|1779709103150");
+        assert!(matches!(real, Frame::Update { item_index: 2, .. }));
     }
 
     #[test]
