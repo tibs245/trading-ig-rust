@@ -15,10 +15,10 @@ use crate::error::{Error, Result};
 mod auth;
 #[cfg(feature = "encryption")]
 pub mod encryption;
-mod tokens;
+pub(crate) mod tokens;
 
 pub use auth::{SessionApi, SessionDetails, SwitchAccountResponse};
-pub use tokens::{AuthTokens, SessionState};
+pub use tokens::{AuthTokens, RefreshState, RestAuth, SessionState, StreamingAuth};
 
 /// User-supplied login credentials.
 #[derive(Debug, Clone)]
@@ -73,7 +73,7 @@ impl SharedSession {
 
     pub async fn require_authenticated(&self) -> Result<SessionState> {
         let s = self.snapshot().await;
-        if s.tokens.is_some() {
+        if s.tokens.has_rest_auth() {
             Ok(s)
         } else {
             Err(Error::Auth(

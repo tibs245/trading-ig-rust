@@ -112,7 +112,7 @@ async fn read_session_returns_details() {
 }
 
 #[tokio::test]
-async fn read_session_with_fetch_tokens_stores_cst_tokens() {
+async fn read_session_with_fetch_tokens_populates_streaming_surface_without_losing_oauth() {
     use support::fixtures::load;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, ResponseTemplate};
@@ -131,12 +131,14 @@ async fn read_session_with_fetch_tokens_stores_cst_tokens() {
         .mount(mock.server())
         .await;
 
-    // Subsequent authenticated call requires CST headers — proves the tokens
-    // were stored after `read(true)` and are now used in place of the OAuth
-    // bearer token from login_v3.
+    // After read(true), the REST surface must STILL carry the OAuth
+    // Bearer (we did not lose v3 capability). This is the regression fix
+    // versus the previous behavior where read(true) overwrote the OAuth
+    // tokens with CST/XST and broke long-running sessions that needed
+    // both REST refresh AND Lightstreamer.
     Mock::given(method("GET"))
         .and(path("accounts"))
-        .and(support::matchers::HasCstHeaders)
+        .and(support::matchers::HasBearer)
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("Content-Type", "application/json; charset=UTF-8")
@@ -148,7 +150,23 @@ async fn read_session_with_fetch_tokens_stores_cst_tokens() {
     let client = mock.client();
     client.session().login().await.expect("login");
     let _ = client.session().read(true).await.expect("read with tokens");
-    let _ = client.accounts().list().await.expect("CST headers used");
+    // REST still uses Bearer (proves OAuth preserved through read(true)).
+    let _ = client
+        .accounts()
+        .list()
+        .await
+        .expect("Bearer header still used for REST");
+
+    // Streaming surface must now have the CST/XST pair populated.
+    let state = client.session_state().await;
+    let streaming = state.tokens.streaming.as_ref().expect("streaming tokens");
+    assert_eq!(streaming.cst, "fetched-cst-token");
+    assert_eq!(streaming.x_security_token, "fetched-xst-token");
+    // Refresh state must also be intact (not blown away).
+    assert!(
+        state.tokens.refresh.is_some(),
+        "refresh state lost after read(true)"
+    );
 }
 
 #[tokio::test]

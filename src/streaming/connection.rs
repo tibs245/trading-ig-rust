@@ -549,19 +549,15 @@ async fn attempt_reconnect(
             continue; // back off and retry
         }
 
-        // Read the new password from the refreshed session state.
+        // Read the new password from the refreshed streaming surface.
+        // login_v2() populates `tokens.streaming` directly.
         let state = session_handle.session.snapshot().await;
-        let new_password = if let Some(crate::session::AuthTokens::Cst {
-            cst,
-            x_security_token,
-        }) = state.tokens.as_ref()
-        {
-            format!("CST-{cst}|XST-{x_security_token}")
-        } else {
-            "unexpected token type after login_v2".clone_into(&mut last_error);
+        let Some(streaming) = state.tokens.streaming.as_ref() else {
+            "no streaming tokens after login_v2".clone_into(&mut last_error);
             warn!(attempt, "Lightstreamer auto-reconnect: {}", last_error);
             continue;
         };
+        let new_password = format!("CST-{}|XST-{}", streaming.cst, streaming.x_security_token);
 
         // Update the stored password so future reconnects use the new tokens.
         conn.password = new_password;

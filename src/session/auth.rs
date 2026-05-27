@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 use crate::error::{Error, Result};
-use crate::session::tokens::{AuthTokens, OAuthPayload, SessionState};
+use crate::session::tokens::{
+    AuthTokens, OAuthPayload, RefreshState, RestAuth, SessionState, StreamingAuth,
+};
 use crate::session::{Credentials, SessionHandle, SessionInfo};
 
 /// Public entry point for session management. Obtain via
@@ -147,11 +149,21 @@ impl SessionApi {
             .to_owned();
 
         let body: LoginResponseV2 = serde_json::from_slice(&resp.body)?;
+        // v2 login yields the same CST/XST pair for both REST and
+        // streaming surfaces. No refresh token is available — recovery
+        // on 401 must go through a full `login_v2()` again.
         let new_state = SessionState {
-            tokens: Some(AuthTokens::Cst {
-                cst,
-                x_security_token: xst,
-            }),
+            tokens: AuthTokens {
+                rest: Some(RestAuth::Cst {
+                    cst: cst.clone(),
+                    x_security_token: xst.clone(),
+                }),
+                streaming: Some(StreamingAuth {
+                    cst,
+                    x_security_token: xst,
+                }),
+                refresh: None,
+            },
             account_id: Some(body.account_id.clone()),
             client_id: Some(body.client_id.clone()),
             lightstreamer_endpoint: Some(body.lightstreamer_endpoint.clone()),
@@ -195,14 +207,23 @@ impl SessionApi {
             ))
         })?;
 
-        let tokens = AuthTokens::OAuth {
-            access_token: body.oauth_token.access_token,
-            refresh_token: body.oauth_token.refresh_token,
-            token_type: body.oauth_token.token_type,
-            expires_at: Instant::now() + Duration::from_secs(expires_in),
+        // v3 login yields OAuth tokens for REST + a refresh_token for
+        // proactive renewal. CST/XST for Lightstreamer are *not*
+        // returned by login_v3 — callers that need streaming must
+        // follow up with `session().read(true)`.
+        let tokens = AuthTokens {
+            rest: Some(RestAuth::OAuth {
+                access_token: body.oauth_token.access_token,
+                token_type: body.oauth_token.token_type,
+            }),
+            streaming: None,
+            refresh: Some(RefreshState {
+                refresh_token: body.oauth_token.refresh_token,
+                expires_at: Instant::now() + Duration::from_secs(expires_in),
+            }),
         };
         let new_state = SessionState {
-            tokens: Some(tokens),
+            tokens,
             account_id: Some(body.account_id.clone()),
             client_id: Some(body.client_id.clone()),
             lightstreamer_endpoint: Some(body.lightstreamer_endpoint.clone()),
@@ -220,10 +241,19 @@ impl SessionApi {
     }
 
     /// Refresh the v3 access token using the stored refresh token.
+    ///
+    /// Updates only the REST + refresh state — the streaming CST/XST
+    /// pair (if populated via `read(true)`) is left untouched, so
+    /// Lightstreamer subscriptions survive a token refresh.
     #[instrument(skip_all)]
     pub async fn refresh(&self) -> Result<()> {
         let state = self.handle.session.snapshot().await;
-        let Some(AuthTokens::OAuth { refresh_token, .. }) = state.tokens else {
+        let Some(refresh_token) = state
+            .tokens
+            .refresh
+            .as_ref()
+            .map(|r| r.refresh_token.clone())
+        else {
             return Err(Error::Auth("no refresh token available".into()));
         };
 
@@ -252,15 +282,21 @@ impl SessionApi {
             .parse::<u64>()
             .map_err(|e| Error::Auth(format!("invalid expires_in: {e}")))?;
 
-        let new_tokens = AuthTokens::OAuth {
+        let new_rest = RestAuth::OAuth {
             access_token: payload.access_token,
-            refresh_token: payload.refresh_token,
             token_type: payload.token_type,
+        };
+        let new_refresh = RefreshState {
+            refresh_token: payload.refresh_token,
             expires_at: Instant::now() + Duration::from_secs(expires_in),
         };
         self.handle
             .session
-            .modify(|s| s.tokens = Some(new_tokens))
+            .modify(|s| {
+                s.tokens.rest = Some(new_rest);
+                s.tokens.refresh = Some(new_refresh);
+                // s.tokens.streaming intentionally left untouched.
+            })
             .await;
         Ok(())
     }
@@ -327,12 +363,13 @@ impl SessionApi {
                 self.handle
                     .session
                     .modify(|s| {
-                        // For v3 sessions we keep the OAuth tokens too — but
-                        // some callers (notably Lightstreamer) need CST/XST.
-                        // We replace the token bag entirely; OAuth holders
-                        // who still want refresh capability should call
-                        // `read(false)` only after they're done streaming.
-                        s.tokens = Some(AuthTokens::Cst {
+                        // Populate the streaming surface only. The REST
+                        // surface (OAuth Bearer for v3 sessions, CST/XST
+                        // for v2) and the refresh state are intentionally
+                        // left untouched — so a v3 session can keep its
+                        // refresh capability while Lightstreamer gets the
+                        // CST/XST pair it requires.
+                        s.tokens.streaming = Some(StreamingAuth {
                             cst,
                             x_security_token,
                         });
