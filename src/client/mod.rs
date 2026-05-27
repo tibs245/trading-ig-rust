@@ -110,6 +110,13 @@ impl IgClient {
         }
     }
 
+    /// Snapshot of the current session state — tokens, account, etc.
+    /// Useful for observability (gauges on token age) and integration
+    /// tests that want to assert which auth surfaces are populated.
+    pub async fn session_state(&self) -> crate::session::SessionState {
+        self.session.snapshot().await
+    }
+
     /// Watchlists API: list, create, delete watchlists; add/remove markets.
     pub fn watchlists(&self) -> WatchlistsApi<'_> {
         WatchlistsApi { client: self }

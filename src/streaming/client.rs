@@ -28,7 +28,7 @@ use tracing::instrument;
 
 use crate::IgClient;
 use crate::error::Result;
-use crate::session::{AuthTokens, SessionHandle};
+use crate::session::SessionHandle;
 use crate::streaming::connection::{CreateParams, LsConnection};
 use crate::streaming::events::{
     AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, TradeUpdate,
@@ -99,23 +99,20 @@ impl StreamingApi<'_> {
             )
         })?;
 
-        // Build Lightstreamer password from CST/XST tokens.
-        // OAuth sessions need CST/XST — caller must call read(true) first to
-        // exchange the OAuth token for a CST/XST pair.
-        let password = match state.tokens.as_ref() {
-            Some(AuthTokens::Cst {
-                cst,
-                x_security_token,
-            }) => format!("CST-{cst}|XST-{x_security_token}"),
-            Some(AuthTokens::OAuth { .. }) => {
+        // Build Lightstreamer password from the streaming CST/XST pair.
+        // v2 logins populate this directly ; v3 (OAuth) sessions need
+        // an explicit `client.session().read(true).await?` first to
+        // populate the streaming surface without losing OAuth.
+        let password = match state.tokens.streaming.as_ref() {
+            Some(s) => format!("CST-{}|XST-{}", s.cst, s.x_security_token),
+            None => {
                 return Err(crate::error::Error::Auth(
-                    "OAuth session cannot be used directly for streaming. \
-                     Call client.session().read(true).await? first to obtain \
-                     CST/XST tokens, then call streaming().connect() again."
+                    "no streaming tokens (CST/XST). Call \
+                     client.session().read(true).await? first to populate \
+                     the streaming surface, then connect()."
                         .into(),
                 ));
             }
-            None => return Err(crate::error::Error::Auth("no active session tokens".into())),
         };
 
         let registry = Registry::new();
