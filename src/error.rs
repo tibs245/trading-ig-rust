@@ -58,14 +58,16 @@ pub struct ApiError {
 }
 
 impl Error {
-    /// True if the error is a `Auth` variant or an `Api` error whose code
-    /// indicates a token issue (e.g. token expired / invalid).
+    /// True for `Error::Auth` or for `Error::Api` whose IG `errorCode`
+    /// matches one of: `oauth-token-invalid`, `client-token-invalid`,
+    /// `client-token-missing`, `security-token-*`.
     pub fn is_auth(&self) -> bool {
         match self {
             Error::Auth(_) => true,
             Error::Api { source, .. } => {
                 let c = source.error_code.as_str();
                 c.contains("oauth-token-invalid")
+                    || c.contains("client-token-invalid")
                     || c.contains("client-token-missing")
                     || c.contains("security-token")
             }

@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 use crate::client::http::Transport;
 use crate::error::{Error, Result};
 
-mod auth;
+pub(crate) mod auth;
 #[cfg(feature = "encryption")]
 pub mod encryption;
 pub(crate) mod tokens;
