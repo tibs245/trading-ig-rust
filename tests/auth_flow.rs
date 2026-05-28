@@ -131,11 +131,6 @@ async fn read_session_with_fetch_tokens_populates_streaming_surface_without_losi
         .mount(mock.server())
         .await;
 
-    // After read(true), the REST surface must STILL carry the OAuth
-    // Bearer (we did not lose v3 capability). This is the regression fix
-    // versus the previous behavior where read(true) overwrote the OAuth
-    // tokens with CST/XST and broke long-running sessions that needed
-    // both REST refresh AND Lightstreamer.
     Mock::given(method("GET"))
         .and(path("accounts"))
         .and(support::matchers::HasBearer)
@@ -149,24 +144,15 @@ async fn read_session_with_fetch_tokens_populates_streaming_surface_without_losi
 
     let client = mock.client();
     client.session().login().await.expect("login");
-    let _ = client.session().read(true).await.expect("read with tokens");
-    // REST still uses Bearer (proves OAuth preserved through read(true)).
-    let _ = client
-        .accounts()
-        .list()
-        .await
-        .expect("Bearer header still used for REST");
+    let _ = client.session().read(true).await.expect("read(true)");
+    let _ = client.accounts().list().await.expect("Bearer still in use");
 
-    // Streaming surface must now have the CST/XST pair populated.
     let state = client.session_state().await;
     let streaming = state.tokens.streaming.as_ref().expect("streaming tokens");
     assert_eq!(streaming.cst, "fetched-cst-token");
     assert_eq!(streaming.x_security_token, "fetched-xst-token");
     // Refresh state must also be intact (not blown away).
-    assert!(
-        state.tokens.refresh.is_some(),
-        "refresh state lost after read(true)"
-    );
+    assert!(state.tokens.refresh.is_some());
 }
 
 #[tokio::test]

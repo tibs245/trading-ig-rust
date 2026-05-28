@@ -538,31 +538,50 @@ async fn attempt_reconnect(
         );
         tokio::time::sleep(backoff).await;
 
-        // Refresh the session tokens so `create_session` uses fresh CST/XST.
-        if let Err(e) = session_handle.session_api().login_v2().await {
-            last_error = format!("session refresh failed: {e}");
+        // Branch on session shape : login_v2() on a v3 session would
+        // wipe the OAuth bearer + refresh_token and demote REST to CST.
+        let api = session_handle.session_api();
+        let session_kind = if session_handle
+            .session
+            .snapshot()
+            .await
+            .tokens
+            .refresh
+            .is_some()
+        {
+            "v3"
+        } else {
+            "v2"
+        };
+        let refresh_result = if session_kind == "v3" {
+            match api.login().await {
+                Ok(_) => api.read(true).await.map(|_| ()),
+                Err(e) => Err(e),
+            }
+        } else {
+            api.login_v2().await.map(|_| ())
+        };
+        if let Err(e) = refresh_result {
+            last_error = format!("session refresh failed ({session_kind}): {e}");
             warn!(
                 attempt,
+                session_kind,
                 error = %e,
                 "Lightstreamer auto-reconnect: token refresh failed"
             );
             continue; // back off and retry
         }
 
-        // Read the new password from the refreshed streaming surface.
-        // login_v2() populates `tokens.streaming` directly.
         let state = session_handle.session.snapshot().await;
         let Some(streaming) = state.tokens.streaming.as_ref() else {
-            "no streaming tokens after login_v2".clone_into(&mut last_error);
+            format!("no streaming tokens after {session_kind} refresh").clone_into(&mut last_error);
             warn!(attempt, "Lightstreamer auto-reconnect: {}", last_error);
             continue;
         };
         let new_password = format!("CST-{}|XST-{}", streaming.cst, streaming.x_security_token);
 
-        // Update the stored password so future reconnects use the new tokens.
         conn.password = new_password;
 
-        // Open a new Lightstreamer session.
         match conn.create_session().await {
             Ok((new_conn, new_stream)) => {
                 info!(

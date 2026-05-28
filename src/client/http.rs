@@ -10,30 +10,25 @@
 //! - Emit a `tracing` span per request, redacting credentials.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use http::{HeaderMap, HeaderValue, Method, StatusCode};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use tokio::sync::Mutex;
 use tracing::{Instrument, debug, debug_span, info, warn};
 
 use crate::config::IgConfig;
 use crate::error::{ApiError, Error, Result};
-use crate::session::tokens::OAuthPayload;
-use crate::session::{RefreshState, RestAuth, SharedSession};
+use crate::session::auth::refresh_oauth_tokens;
+use crate::session::tokens::SessionState;
+use crate::session::{RestAuth, SharedSession};
 
 const HDR_API_KEY: &str = "X-IG-API-KEY";
 const HDR_VERSION: &str = "Version";
 const HDR_ACCOUNT_ID: &str = "IG-ACCOUNT-ID";
 const HDR_CST: &str = "CST";
 const HDR_XST: &str = "X-SECURITY-TOKEN";
-
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-struct RefreshTokenRequest<'a> {
-    refresh_token: &'a str,
-}
 
 /// Raw HTTP response surfaced by [`Transport::request_unauthenticated`].
 /// Used for the login flow which needs to read response headers.
@@ -49,6 +44,9 @@ pub(crate) struct RawResponse {
 pub struct Transport {
     inner: reqwest::Client,
     config: Arc<IgConfig>,
+    /// Serialises OAuth refreshes — IG rotates the `refresh_token` on
+    /// every call, so concurrent POSTs invalidate each other.
+    refresh_lock: Arc<Mutex<()>>,
 }
 
 impl Transport {
@@ -57,7 +55,11 @@ impl Transport {
             .user_agent(&config.user_agent)
             .timeout(config.request_timeout)
             .build()?;
-        Ok(Self { inner, config })
+        Ok(Self {
+            inner,
+            config,
+            refresh_lock: Arc::new(Mutex::new(())),
+        })
     }
 
     fn url(&self, path: &str) -> Result<reqwest::Url> {
@@ -78,7 +80,6 @@ impl Transport {
         Ok(h)
     }
 
-    /// Used by the login/refresh flow before any session exists.
     pub(crate) async fn request_unauthenticated<B: Serialize + ?Sized>(
         &self,
         method: Method,
@@ -114,19 +115,8 @@ impl Transport {
         .await
     }
 
-    /// Authenticated request returning the raw response (status + headers +
-    /// body bytes). Used by endpoints that need to read response headers,
-    /// e.g. `GET /session?fetchSessionTokens=true` which puts the CST and
-    /// X-SECURITY-TOKEN values into headers, not the body.
-    ///
-    /// **Auto-refresh behavior** : before every request, the active OAuth
-    /// token (if any) is checked against
-    /// [`IgConfig::token_refresh_skew`] and proactively refreshed if it
-    /// would expire within that window. If the request itself returns
-    /// 401, a refresh + retry is attempted once before surfacing the
-    /// error. Sessions on the v2 (CST) flow have no refresh mechanism,
-    /// so 401s on that path propagate to the caller (who can restart
-    /// `login_v2()` if needed).
+    /// Proactive refresh before issue + reactive refresh + retry on 401.
+    /// v2 sessions skip both paths (no `refresh_token`).
     pub(crate) async fn request_authenticated_raw<B>(
         &self,
         method: Method,
@@ -138,44 +128,34 @@ impl Transport {
     where
         B: Serialize + ?Sized,
     {
-        // 1. Proactive refresh : if the access token is about to expire,
-        //    refresh it before issuing the request. Failures here are
-        //    logged but non-fatal — the request will still attempt with
-        //    the (possibly stale) token, and the reactive path below
-        //    will catch the resulting 401.
-        if let Err(e) = self.ensure_token_valid(session).await {
-            warn!(error = %e, "proactive token refresh failed; continuing with stale token");
+        let mut state = session.snapshot().await;
+
+        if state.tokens.needs_refresh(self.config.token_refresh_skew) {
+            if let Err(e) = self.refresh_if_needed(session).await {
+                warn!(error = %e, "proactive token refresh failed; continuing with stale token");
+            }
+            state = session.snapshot().await;
         }
 
-        // 2. First attempt with current tokens.
         let first = self
-            .attempt_authenticated_raw(&method, path, version, body, session)
+            .attempt_authenticated_raw(&method, path, version, body, &state)
             .await;
 
-        // 3. Reactive : on 401 (likely client-token-invalid), try
-        //    refresh + retry once. Only do this if we actually have a
-        //    refresh state (OAuth session). v2 sessions surface the
-        //    401 unchanged.
-        //
-        //    If the refresh itself fails we propagate the *original*
-        //    401 — it's the more meaningful error for the caller
-        //    (refresh failure is incidental to the actual call).
+        // Surface the original 401 if the refresh itself fails.
         match first {
             Err(Error::Api { status, source }) if status == StatusCode::UNAUTHORIZED => {
-                if !self.has_refresh_state(session).await {
+                if state.tokens.refresh.is_none() {
                     return Err(Error::Api { status, source });
                 }
                 warn!("401 from IG — attempting reactive OAuth refresh + retry");
-                match self.do_refresh_oauth(session).await {
+                match self.refresh_if_needed_forced(session).await {
                     Ok(()) => {
-                        self.attempt_authenticated_raw(&method, path, version, body, session)
+                        let fresh = session.snapshot().await;
+                        self.attempt_authenticated_raw(&method, path, version, body, &fresh)
                             .await
                     }
                     Err(refresh_err) => {
-                        warn!(
-                            refresh_error = %refresh_err,
-                            "reactive refresh failed — surfacing original 401"
-                        );
+                        warn!(refresh_error = %refresh_err, "reactive refresh failed");
                         Err(Error::Api { status, source })
                     }
                 }
@@ -184,27 +164,21 @@ impl Transport {
         }
     }
 
-    /// Inject auth headers from the current session state and execute
-    /// the request. Does not refresh tokens — call sites that need
-    /// auto-refresh go through [`request_authenticated_raw`].
     async fn attempt_authenticated_raw<B>(
         &self,
         method: &Method,
         path: &str,
         version: Option<u8>,
         body: Option<&B>,
-        session: &SharedSession,
+        state: &SessionState,
     ) -> Result<RawResponse>
     where
         B: Serialize + ?Sized,
     {
         let url = self.url(path)?;
         let mut headers = self.base_headers(version)?;
-        let state = session.snapshot().await;
         let Some(rest_auth) = state.tokens.rest.as_ref() else {
-            return Err(Error::Auth(
-                "no active session — call session().login() first".into(),
-            ));
+            return Err(Error::Auth("no active session — call login() first".into()));
         };
         match rest_auth {
             RestAuth::Cst {
@@ -257,88 +231,62 @@ impl Transport {
         .await
     }
 
-    /// True when the session has a refresh token (v3 OAuth flow). v2
-    /// (CST) sessions return false and cannot self-refresh.
-    async fn has_refresh_state(&self, session: &SharedSession) -> bool {
-        session.snapshot().await.tokens.refresh.is_some()
-    }
-
-    /// Trigger a proactive OAuth refresh if the access token is within
-    /// [`IgConfig::token_refresh_skew`] of its expiry. No-op for v2
-    /// sessions (no refresh state) and for OAuth sessions that still
-    /// have plenty of TTL.
-    async fn ensure_token_valid(&self, session: &SharedSession) -> Result<()> {
-        let snapshot = session.snapshot().await;
-        if !snapshot
-            .tokens
-            .needs_refresh(self.config.token_refresh_skew)
-        {
-            return Ok(());
-        }
-        info!(
-            skew_seconds = self.config.token_refresh_skew.as_secs(),
-            "OAuth token within refresh skew — proactive refresh"
-        );
-        self.do_refresh_oauth(session).await
-    }
-
-    /// POST `/session/refresh-token` with the stored `refresh_token`
-    /// and update the session's REST + refresh state with the new
-    /// payload. The streaming surface is intentionally untouched so an
-    /// active Lightstreamer subscription survives the refresh.
-    async fn do_refresh_oauth(&self, session: &SharedSession) -> Result<()> {
-        let Some(refresh_token) = session
+    /// DCL on `expires_at` identity rather than `needs_refresh` — when
+    /// skew ≥ TTL, the rotated token would itself need refresh and
+    /// every waiter would still POST.
+    async fn refresh_if_needed(&self, session: &SharedSession) -> Result<()> {
+        let before = match session.snapshot().await.tokens.refresh.as_ref() {
+            Some(r) => r.expires_at,
+            None => return Ok(()),
+        };
+        let _guard = self.refresh_lock.lock().await;
+        let after = session
             .snapshot()
             .await
             .tokens
             .refresh
             .as_ref()
-            .map(|r| r.refresh_token.clone())
-        else {
-            return Err(Error::Auth(
-                "no refresh token available — session was authenticated via v2".into(),
-            ));
-        };
-
-        let resp = self
-            .request_unauthenticated(
-                Method::POST,
-                "session/refresh-token",
-                Some(1),
-                Some(&RefreshTokenRequest {
-                    refresh_token: &refresh_token,
-                }),
-            )
-            .await?;
-
-        let payload: OAuthPayload = serde_json::from_slice(&resp.body)?;
-        let expires_in = payload.expires_in.parse::<u64>().map_err(|e| {
-            Error::Auth(format!("invalid expires_in '{}': {e}", payload.expires_in))
-        })?;
-
-        let new_rest = RestAuth::OAuth {
-            access_token: payload.access_token,
-            token_type: payload.token_type,
-        };
-        let new_refresh = RefreshState {
-            refresh_token: payload.refresh_token,
-            expires_at: Instant::now() + Duration::from_secs(expires_in),
-        };
-        session
-            .modify(|s| {
-                s.tokens.rest = Some(new_rest);
-                s.tokens.refresh = Some(new_refresh);
-            })
-            .await;
+            .map(|r| r.expires_at);
+        if after != Some(before) {
+            debug!("token rotated by another caller — skip");
+            return Ok(());
+        }
         info!(
-            ttl_seconds = expires_in,
-            "OAuth refresh successful — REST + refresh tokens rotated"
+            skew_seconds = self.config.token_refresh_skew.as_secs(),
+            "OAuth proactive refresh"
         );
+        refresh_oauth_tokens(self, session).await?;
+        info!("OAuth refresh successful");
         Ok(())
     }
 
-    /// Authenticated request that deserialises the JSON body. Reads the
-    /// active tokens from `session` and injects the appropriate auth headers.
+    /// Called after a 401 — same DCL but skips the `needs_refresh` gate
+    /// (IG can rotate server-side independently of TTL).
+    async fn refresh_if_needed_forced(&self, session: &SharedSession) -> Result<()> {
+        let before = session
+            .snapshot()
+            .await
+            .tokens
+            .refresh
+            .as_ref()
+            .map(|r| r.expires_at);
+        let _guard = self.refresh_lock.lock().await;
+        let after = session
+            .snapshot()
+            .await
+            .tokens
+            .refresh
+            .as_ref()
+            .map(|r| r.expires_at);
+        if before != after {
+            debug!("token rotated by another caller — skip");
+            return Ok(());
+        }
+        refresh_oauth_tokens(self, session).await?;
+        info!("OAuth refresh successful (reactive)");
+        Ok(())
+    }
+
     pub(crate) async fn request<B, R>(
         &self,
         method: Method,
@@ -355,8 +303,7 @@ impl Transport {
             .request_authenticated_raw(method, path, version, body, session)
             .await?;
         if raw.body.is_empty() {
-            // Endpoints that legitimately return an empty body (DELETE) need
-            // a `()` response type; let serde handle that case.
+            // DELETE responses may have empty body — let serde deser `()`.
             return Ok(serde_json::from_value(serde_json::Value::Null)?);
         }
         Ok(serde_json::from_slice(&raw.body)?)

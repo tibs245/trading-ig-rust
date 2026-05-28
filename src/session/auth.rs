@@ -6,11 +6,12 @@ use http::Method;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
+use crate::client::http::Transport;
 use crate::error::{Error, Result};
 use crate::session::tokens::{
     AuthTokens, OAuthPayload, RefreshState, RestAuth, SessionState, StreamingAuth,
 };
-use crate::session::{Credentials, SessionHandle, SessionInfo};
+use crate::session::{Credentials, SessionHandle, SessionInfo, SharedSession};
 
 /// Public entry point for session management. Obtain via
 /// [`crate::IgClient::session`].
@@ -149,9 +150,6 @@ impl SessionApi {
             .to_owned();
 
         let body: LoginResponseV2 = serde_json::from_slice(&resp.body)?;
-        // v2 login yields the same CST/XST pair for both REST and
-        // streaming surfaces. No refresh token is available — recovery
-        // on 401 must go through a full `login_v2()` again.
         let new_state = SessionState {
             tokens: AuthTokens {
                 rest: Some(RestAuth::Cst {
@@ -207,10 +205,7 @@ impl SessionApi {
             ))
         })?;
 
-        // v3 login yields OAuth tokens for REST + a refresh_token for
-        // proactive renewal. CST/XST for Lightstreamer are *not*
-        // returned by login_v3 — callers that need streaming must
-        // follow up with `session().read(true)`.
+        // Streaming CST/XST require a follow-up `session().read(true)`.
         let tokens = AuthTokens {
             rest: Some(RestAuth::OAuth {
                 access_token: body.oauth_token.access_token,
@@ -240,67 +235,73 @@ impl SessionApi {
         })
     }
 
-    /// Refresh the v3 access token using the stored refresh token.
-    ///
-    /// Updates only the REST + refresh state — the streaming CST/XST
-    /// pair (if populated via `read(true)`) is left untouched, so
-    /// Lightstreamer subscriptions survive a token refresh.
+    /// Updates REST + refresh state. Streaming CST/XST untouched.
     #[instrument(skip_all)]
     pub async fn refresh(&self) -> Result<()> {
-        let state = self.handle.session.snapshot().await;
-        let Some(refresh_token) = state
-            .tokens
-            .refresh
-            .as_ref()
-            .map(|r| r.refresh_token.clone())
-        else {
-            return Err(Error::Auth("no refresh token available".into()));
-        };
-
-        #[derive(Serialize)]
-        #[serde(rename_all = "snake_case")]
-        struct Req<'a> {
-            refresh_token: &'a str,
-        }
-
-        let resp = self
-            .handle
-            .transport
-            .request_unauthenticated(
-                Method::POST,
-                "session/refresh-token",
-                Some(1),
-                Some(&Req {
-                    refresh_token: &refresh_token,
-                }),
-            )
-            .await?;
-
-        let payload: OAuthPayload = serde_json::from_slice(&resp.body)?;
-        let expires_in = payload
-            .expires_in
-            .parse::<u64>()
-            .map_err(|e| Error::Auth(format!("invalid expires_in: {e}")))?;
-
-        let new_rest = RestAuth::OAuth {
-            access_token: payload.access_token,
-            token_type: payload.token_type,
-        };
-        let new_refresh = RefreshState {
-            refresh_token: payload.refresh_token,
-            expires_at: Instant::now() + Duration::from_secs(expires_in),
-        };
-        self.handle
-            .session
-            .modify(|s| {
-                s.tokens.rest = Some(new_rest);
-                s.tokens.refresh = Some(new_refresh);
-                // s.tokens.streaming intentionally left untouched.
-            })
-            .await;
-        Ok(())
+        refresh_oauth_tokens(&self.handle.transport, &self.handle.session).await
     }
+}
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct RefreshTokenRequest<'a> {
+    pub refresh_token: &'a str,
+}
+
+/// Caller must hold `Transport::refresh_lock` — IG rotates the
+/// `refresh_token` on every call, so concurrent POSTs invalidate each
+/// other.
+pub(crate) async fn refresh_oauth_tokens(
+    transport: &Transport,
+    session: &SharedSession,
+) -> Result<()> {
+    let Some(refresh_token) = session
+        .snapshot()
+        .await
+        .tokens
+        .refresh
+        .as_ref()
+        .map(|r| r.refresh_token.clone())
+    else {
+        return Err(Error::Auth("no refresh token (v2 session)".into()));
+    };
+
+    let resp = transport
+        .request_unauthenticated(
+            Method::POST,
+            "session/refresh-token",
+            Some(1),
+            Some(&RefreshTokenRequest {
+                refresh_token: &refresh_token,
+            }),
+        )
+        .await?;
+
+    let payload: OAuthPayload = serde_json::from_slice(&resp.body)?;
+    let expires_in = payload
+        .expires_in
+        .parse::<u64>()
+        .map_err(|e| Error::Auth(format!("invalid expires_in '{}': {e}", payload.expires_in)))?;
+
+    let new_rest = RestAuth::OAuth {
+        access_token: payload.access_token,
+        token_type: payload.token_type,
+    };
+    let new_refresh = RefreshState {
+        refresh_token: payload.refresh_token,
+        expires_at: Instant::now() + Duration::from_secs(expires_in),
+    };
+    session
+        .modify(|s| {
+            s.tokens.rest = Some(new_rest);
+            s.tokens.refresh = Some(new_refresh);
+            // streaming intentionally untouched
+        })
+        .await;
+    Ok(())
+}
+
+impl SessionApi {
     /// Tear down the current session on the server side and locally.
     #[instrument(skip_all)]
     pub async fn logout(&self) -> Result<()> {
@@ -363,12 +364,7 @@ impl SessionApi {
                 self.handle
                     .session
                     .modify(|s| {
-                        // Populate the streaming surface only. The REST
-                        // surface (OAuth Bearer for v3 sessions, CST/XST
-                        // for v2) and the refresh state are intentionally
-                        // left untouched — so a v3 session can keep its
-                        // refresh capability while Lightstreamer gets the
-                        // CST/XST pair it requires.
+                        // rest + refresh intentionally preserved
                         s.tokens.streaming = Some(StreamingAuth {
                             cst,
                             x_security_token,
