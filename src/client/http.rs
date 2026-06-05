@@ -201,12 +201,28 @@ impl Transport {
                 }
             }
         }
-        let span = debug_span!("ig.http", %method, path = %path, version = ?version);
+
+        // IG drops the body on real DELETE — mirror the Python client and
+        // tunnel body-carrying DELETEs through POST + `_method: DELETE`.
+        let (effective_method, override_method) = if *method == Method::DELETE && body.is_some() {
+            (Method::POST, Some("DELETE"))
+        } else {
+            (method.clone(), None)
+        };
+        if let Some(m) = override_method {
+            headers.insert("_method", HeaderValue::from_static(m));
+        }
+
+        let span = debug_span!(
+            "ig.http",
+            method = %effective_method,
+            path = %path,
+            version = ?version,
+        );
         let inner = self.inner.clone();
-        let method_owned = method.clone();
 
         async move {
-            let mut req = inner.request(method_owned, url).headers(headers);
+            let mut req = inner.request(effective_method, url).headers(headers);
             if let Some(b) = body {
                 req = req.json(b);
             }

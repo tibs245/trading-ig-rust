@@ -231,14 +231,20 @@ impl UpdatePositionRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClosePositionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub deal_id: Option<DealId>,
     pub direction: Direction,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub epic: Option<Epic>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub level: Option<f64>,
     pub order_type: OrderType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub quote_id: Option<String>,
     pub size: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub time_in_force: Option<TimeInForce>,
 }
 
@@ -373,5 +379,41 @@ fn market_status_str(s: crate::models::common::MarketStatus) -> &'static str {
         MarketStatus::OnAuctionNoEdits => "ON_AUCTION_NO_EDITS",
         MarketStatus::Suspended => "SUSPENDED",
         MarketStatus::Unknown => "UNKNOWN",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn close_request_serializes_without_nulls() {
+        let req = ClosePositionRequest {
+            deal_id: Some(DealId::new("DIAAAAXPBQ23AAS")),
+            direction: Direction::Sell,
+            epic: None,
+            expiry: None,
+            level: None,
+            order_type: OrderType::Market,
+            quote_id: None,
+            size: 1.0,
+            time_in_force: None,
+        };
+
+        let json = serde_json::to_string(&req).expect("serialises");
+        assert!(
+            !json.contains("null"),
+            "no null fields expected, got: {json}"
+        );
+        assert!(json.contains("\"dealId\":\"DIAAAAXPBQ23AAS\""));
+        assert!(json.contains("\"direction\":\"SELL\""));
+        assert!(json.contains("\"orderType\":\"MARKET\""));
+        assert!(json.contains("\"size\":1"));
+        for absent in ["epic", "expiry", "level", "quoteId", "timeInForce"] {
+            assert!(
+                !json.contains(absent),
+                "{absent} should be skipped, got: {json}"
+            );
+        }
     }
 }
