@@ -604,8 +604,7 @@ async fn close_position_golden_path() {
 async fn close_position_api_error() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;
-    mock.mount_error(
-        "DELETE",
+    mock.mount_delete_error(
         "positions/otc",
         400,
         "error.public-api.failure.position.unknown",
@@ -644,4 +643,91 @@ async fn close_position_api_error() {
         }
         other => panic!("expected Error::Api, got {other:?}"),
     }
+}
+#[tokio::test]
+async fn close_position_rewrites_delete_to_post_with_method_override() {
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+    use wiremock::matchers::{header, header_exists, method, path};
+    use wiremock::{Mock, Request, ResponseTemplate};
+
+    struct BodyCaptureResponder {
+        captured: Arc<Mutex<Option<Vec<u8>>>>,
+        body: String,
+    }
+
+    impl wiremock::Respond for BodyCaptureResponder {
+        fn respond(&self, request: &Request) -> ResponseTemplate {
+            if let Ok(mut g) = self.captured.try_lock() {
+                *g = Some(request.body.clone());
+            }
+            ResponseTemplate::new(200)
+                .insert_header("Content-Type", "application/json; charset=UTF-8")
+                .set_body_string(&self.body)
+        }
+    }
+
+    let mock = IgMockServer::start().await;
+    mock.mount_login_v3().await;
+
+    let captured: Arc<Mutex<Option<Vec<u8>>>> = Arc::new(Mutex::new(None));
+    let captured_for_responder = Arc::clone(&captured);
+
+    let close_fixture = support::fixtures::load("dealing/positions/close_v1.json");
+    Mock::given(method("POST"))
+        .and(path("positions/otc"))
+        .and(header_exists("X-IG-API-KEY"))
+        .and(header("_method", "DELETE"))
+        .and(header("Version", "1"))
+        .respond_with(BodyCaptureResponder {
+            captured: captured_for_responder,
+            body: close_fixture,
+        })
+        .mount(mock.server())
+        .await;
+
+    mock.mount_get(
+        "confirms/ref-close-001",
+        1,
+        "dealing/confirms/close_accepted_v1.json",
+    )
+    .await;
+
+    let client = mock.client();
+    client.session().login().await.expect("login");
+
+    let req = ClosePositionRequest {
+        deal_id: Some(DealId::new("DIAAAABBBCCC02")),
+        direction: Direction::Sell,
+        epic: None,
+        expiry: None,
+        level: None,
+        order_type: OrderType::Market,
+        quote_id: None,
+        size: 1.0,
+        time_in_force: None,
+    };
+
+    let conf = client
+        .dealing()
+        .positions()
+        .close(req)
+        .await
+        .expect("close succeeds when rewritten");
+    assert_eq!(conf.deal_status, DealStatus::Accepted);
+
+    let body_bytes = captured.lock().await.clone().expect("body captured");
+    let body = String::from_utf8(body_bytes).expect("body is UTF-8");
+    let v: serde_json::Value = serde_json::from_str(&body).expect("body is JSON");
+
+    // Body survived the rewrite intact.
+    assert_eq!(v["dealId"], "DIAAAABBBCCC02");
+    assert_eq!(v["direction"], "SELL");
+    assert_eq!(v["orderType"], "MARKET");
+    assert_eq!(v["size"], 1.0);
+    // And no nulls leaked through.
+    assert!(
+        !body.contains("null"),
+        "no null fields should be serialised, got: {body}"
+    );
 }

@@ -19,7 +19,7 @@ use wiremock::matchers::{header_exists, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::fixtures;
-use super::matchers::{HasApiKey, HasVersion};
+use super::matchers::{HasApiKey, HasMethodOverride, HasVersion};
 
 pub struct IgMockServer {
     pub server: MockServer,
@@ -150,17 +150,33 @@ impl IgMockServer {
         self
     }
 
-    /// Mount a fixture-backed JSON response for an authenticated DELETE.
+    /// Body-carrying DELETEs are tunnelled as `POST` + `_method: DELETE`.
     pub async fn mount_delete_json(&self, path_str: &str, version: u8, fixture: &str) -> &Self {
         let body = fixtures::load(fixture);
-        Mock::given(method("DELETE"))
+        Mock::given(method("POST"))
             .and(path(path_str))
             .and(HasApiKey)
             .and(HasVersion(version))
+            .and(HasMethodOverride("DELETE"))
             .respond_with(
                 ResponseTemplate::new(200)
                     .insert_header("Content-Type", "application/json; charset=UTF-8")
                     .set_body_string(body),
+            )
+            .mount(&self.server)
+            .await;
+        self
+    }
+
+    pub async fn mount_delete_error(&self, path_str: &str, status: u16, error_code: &str) -> &Self {
+        Mock::given(method("POST"))
+            .and(path(path_str))
+            .and(header_exists("X-IG-API-KEY"))
+            .and(HasMethodOverride("DELETE"))
+            .respond_with(
+                ResponseTemplate::new(status)
+                    .insert_header("Content-Type", "application/json; charset=UTF-8")
+                    .set_body_string(format!(r#"{{"errorCode":"{error_code}"}}"#)),
             )
             .mount(&self.server)
             .await;

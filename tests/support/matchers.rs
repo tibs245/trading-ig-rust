@@ -48,3 +48,15 @@ impl Match for HasCstHeaders {
         request.headers.contains_key("CST") && request.headers.contains_key("X-SECURITY-TOKEN")
     }
 }
+
+pub struct HasMethodOverride(pub &'static str);
+
+impl Match for HasMethodOverride {
+    fn matches(&self, request: &Request) -> bool {
+        request
+            .headers
+            .get("_method")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|s| s == self.0)
+    }
+}

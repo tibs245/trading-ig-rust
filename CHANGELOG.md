@@ -5,6 +5,35 @@ All notable changes to `trading-ig` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-06-05
+
+### Fixed
+
+- **`close_position` rejected with `validation.null-not-allowed.request`.**
+  IG silently drops the body of real `DELETE` requests, so every
+  required field on `ClosePositionRequest` was reported as null. The
+  transport now mirrors the official Python `trading-ig` client and
+  rewrites body-carrying `DELETE`s as `POST` with an `_method: DELETE`
+  header. Bodyless DELETEs (`session` logout, `watchlists` delete,
+  `workingorders` delete) are untouched. Validated live on a demo
+  account: position fully closed, expected P/L confirmed.
+- Defence in depth: `ClosePositionRequest` now carries
+  `#[serde(skip_serializing_if = "Option::is_none")]` on every optional
+  field, so explicit `null`s never reach IG even if a future code path
+  bypasses the transport rewrite.
+
+### Added
+
+- `examples/diag_close_position.rs` — list open positions and close the
+  first, logging the outbound JSON. Handy when reproducing the
+  null-not-allowed bug or validating the rewrite against a fresh demo
+  account.
+- `tests/dealing_positions.rs::close_position_rewrites_delete_to_post_with_method_override`
+  pins the rewrite + asserts the JSON body survives intact.
+- `tests/support/matchers::HasMethodOverride` and
+  `IgMockServer::mount_delete_error` helpers for tests that target
+  body-carrying DELETE endpoints.
+
 ## [0.1.1] — 2026-04-29
 
 ### Added
