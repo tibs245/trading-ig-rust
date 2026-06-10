@@ -6,9 +6,10 @@
 //! the [`Registry`] in `subscription.rs`.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use reqwest::Client;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{RwLock, mpsc, watch};
 use tracing::{debug, error, info, warn};
 
 use crate::error::{Error, Result};
@@ -106,13 +107,27 @@ pub(crate) struct LsConnection {
     pub(crate) control_address: Option<String>,
 }
 
+/// Connection state shared between the [`StreamingClient`] and its background
+/// read-loop. A reconnect swaps the inner `LsConnection` under the write lock,
+/// so every subsequent `control`/`unsubscribe`/`subscribe_*` reads the CURRENT
+/// session id from the same lock instead of a stale clone (P1-15).
+pub(crate) type SharedConn = Arc<RwLock<LsConnection>>;
+
+/// Owned snapshot of the fields a single `control.txt` request needs, taken
+/// under a short read lock and used after the lock is dropped (DD-9).
+struct RequestSnapshot {
+    client: Client,
+    control_url: String,
+    session_id: String,
+}
+
 impl LsConnection {
     /// Open a new Lightstreamer session via `create_session.txt`.
     ///
     /// Returns the connection object.  A background task is spawned that
     /// reads frames and dispatches them to registered subscribers.
     /// Sending `true` on `shutdown_tx` stops the read-loop.
-    pub(crate) async fn create(params: CreateParams) -> Result<Self> {
+    pub(crate) async fn create(params: CreateParams) -> Result<SharedConn> {
         let CreateParams {
             endpoint,
             username,
@@ -158,25 +173,21 @@ impl LsConnection {
 
         info!(%session_id, "Lightstreamer session created");
 
-        let conn = LsConnection {
-            client: client.clone(),
-            endpoint: endpoint.clone(),
-            username: username.clone(),
-            password: password.clone(),
-            session_id: session_id.clone(),
-            control_address: control_address.clone(),
-        };
-
-        // Spawn the background read-loop.
-        let registry2 = registry.clone();
-        let conn2 = LsConnection {
+        // Single shared connection: the returned client and the read-loop both
+        // hold this Arc, so a reconnect-driven swap is visible to every later
+        // control/subscribe (P1-15).
+        let conn: SharedConn = Arc::new(RwLock::new(LsConnection {
             client,
             endpoint,
             username,
             password,
             session_id,
             control_address,
-        };
+        }));
+
+        // Spawn the background read-loop on a clone of the same shared handle.
+        let registry2 = registry.clone();
+        let conn2 = Arc::clone(&conn);
         let mut shutdown_rx = shutdown_tx.subscribe();
         tokio::spawn(async move {
             tokio::select! {
@@ -208,82 +219,19 @@ impl LsConnection {
         }
     }
 
-    /// Send a `control.txt` request (subscribe / unsubscribe).
-    pub(crate) async fn control(
-        &self,
-        op: &str,
-        item_index: usize,
-        item_name: &str,
-        fields: &str,
-        mode: &str,
-    ) -> Result<()> {
-        let base = self.control_base_url();
-        let url = format!("{base}/lightstreamer/control.txt");
-
-        let item_index_str = item_index.to_string();
-        let mut params = HashMap::new();
-        params.insert("LS_session", self.session_id.as_str());
-        params.insert("LS_op", op);
-        params.insert("LS_table", item_index_str.as_str());
-        params.insert("LS_id", item_name);
-        params.insert("LS_schema", fields);
-        params.insert("LS_mode", mode);
-
-        let resp = self
-            .client
-            .post(&url)
-            .form(&params)
-            .send()
-            .await
-            .map_err(Error::Http)?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.bytes().await.map_err(Error::Http)?;
-            return Err(Error::Auth(format!(
-                "Lightstreamer control failed ({status}): {}",
-                String::from_utf8_lossy(&body)
-            )));
+    /// Snapshot the small per-request fields (client + url + session id) under
+    /// a read lock so the HTTP call below NEVER holds the lock across `.await`
+    /// (DD-9). The returned owned values reflect the CURRENT session.
+    fn request_snapshot(&self) -> RequestSnapshot {
+        RequestSnapshot {
+            client: self.client.clone(),
+            control_url: format!("{}/lightstreamer/control.txt", self.control_base_url()),
+            session_id: self.session_id.clone(),
         }
-
-        // Lightstreamer answers `200 OK` with body `ERROR\n<code>\n<msg>` for a
-        // dead/unknown session — the HTTP status alone is not the truth. Without
-        // this the `add` silently "succeeds" and the feed stays dead.
-        let body = resp.bytes().await.map_err(Error::Http)?;
-        classify_control_body(&String::from_utf8_lossy(&body))
-    }
-
-    /// Send a `control.txt` unsubscribe for the given item index.
-    pub(crate) async fn unsubscribe(&self, item_index: usize) -> Result<()> {
-        let base = self.control_base_url();
-        let url = format!("{base}/lightstreamer/control.txt");
-        let item_index_str = item_index.to_string();
-        let mut params = HashMap::new();
-        params.insert("LS_session", self.session_id.as_str());
-        params.insert("LS_op", "delete");
-        params.insert("LS_table", item_index_str.as_str());
-
-        let resp = self
-            .client
-            .post(&url)
-            .form(&params)
-            .send()
-            .await
-            .map_err(Error::Http)?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.bytes().await.map_err(Error::Http)?;
-            return Err(Error::Auth(format!(
-                "Lightstreamer unsubscribe failed ({status}): {}",
-                String::from_utf8_lossy(&body)
-            )));
-        }
-        Ok(())
     }
 
     /// Open a `bind_session.txt` connection and return the streaming response.
-    async fn bind(&self) -> Result<LsStream> {
+    async fn bind_inner(&self) -> Result<LsStream> {
         let url = format!("{}/lightstreamer/bind_session.txt", self.endpoint);
         debug!(%url, session_id = %self.session_id, "binding Lightstreamer session");
 
@@ -315,7 +263,7 @@ impl LsConnection {
     ///
     /// On success, the caller must replace the current stream and update
     /// `self` with the returned connection's session ID / control address.
-    async fn create_session(&self) -> Result<(LsConnection, LsStream)> {
+    async fn create_session_inner(&self) -> Result<(LsConnection, LsStream)> {
         let url = format!("{}/lightstreamer/create_session.txt", self.endpoint);
         debug!(%url, "re-creating Lightstreamer session after END");
 
@@ -356,6 +304,101 @@ impl LsConnection {
         };
         Ok((new_conn, stream))
     }
+}
+
+// ---------------------------------------------------------------------------
+// control.txt requests against the shared connection
+// ---------------------------------------------------------------------------
+
+/// Send a `control.txt` request (subscribe / unsubscribe) using the CURRENT
+/// session in `conn`. Snapshots session id + url under a short read lock, drops
+/// the guard, THEN awaits the HTTP — never holding the lock across `.await`.
+pub(crate) async fn control(
+    conn: &SharedConn,
+    op: &str,
+    item_index: usize,
+    item_name: &str,
+    fields: &str,
+    mode: &str,
+) -> Result<()> {
+    let snap = conn.read().await.request_snapshot();
+
+    let item_index_str = item_index.to_string();
+    let mut params = HashMap::new();
+    params.insert("LS_session", snap.session_id.as_str());
+    params.insert("LS_op", op);
+    params.insert("LS_table", item_index_str.as_str());
+    params.insert("LS_id", item_name);
+    params.insert("LS_schema", fields);
+    params.insert("LS_mode", mode);
+
+    let resp = snap
+        .client
+        .post(&snap.control_url)
+        .form(&params)
+        .send()
+        .await
+        .map_err(Error::Http)?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.bytes().await.map_err(Error::Http)?;
+        return Err(Error::Auth(format!(
+            "Lightstreamer control failed ({status}): {}",
+            String::from_utf8_lossy(&body)
+        )));
+    }
+
+    // Lightstreamer answers `200 OK` with body `ERROR\n<code>\n<msg>` for a
+    // dead/unknown session — the HTTP status alone is not the truth. Without
+    // this the `add` silently "succeeds" and the feed stays dead.
+    let body = resp.bytes().await.map_err(Error::Http)?;
+    classify_control_body(&String::from_utf8_lossy(&body))
+}
+
+/// Send a `control.txt` unsubscribe for `item_index` using the CURRENT session.
+pub(crate) async fn unsubscribe(conn: &SharedConn, item_index: usize) -> Result<()> {
+    let snap = conn.read().await.request_snapshot();
+
+    let item_index_str = item_index.to_string();
+    let mut params = HashMap::new();
+    params.insert("LS_session", snap.session_id.as_str());
+    params.insert("LS_op", "delete");
+    params.insert("LS_table", item_index_str.as_str());
+
+    let resp = snap
+        .client
+        .post(&snap.control_url)
+        .form(&params)
+        .send()
+        .await
+        .map_err(Error::Http)?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.bytes().await.map_err(Error::Http)?;
+        return Err(Error::Auth(format!(
+            "Lightstreamer unsubscribe failed ({status}): {}",
+            String::from_utf8_lossy(&body)
+        )));
+    }
+    Ok(())
+}
+
+/// Open a `bind_session.txt` connection on the CURRENT session in `conn`.
+///
+/// Snapshots the connection under a short read lock, drops the guard, then
+/// awaits the HTTP — the lock is never held across `.await`.
+async fn bind(conn: &SharedConn) -> Result<LsStream> {
+    let snapshot = conn.read().await.clone();
+    snapshot.bind_inner().await
+}
+
+/// Create a brand-new Lightstreamer session from the CURRENT credentials in
+/// `conn`. Same snapshot-then-release discipline as [`bind`].
+async fn create_session(conn: &SharedConn) -> Result<(LsConnection, LsStream)> {
+    let snapshot = conn.read().await.clone();
+    snapshot.create_session_inner().await
 }
 
 // ---------------------------------------------------------------------------
@@ -448,24 +491,22 @@ enum DrainOutcome {
 async fn read_loop(
     mut stream: LsStream,
     registry: Registry,
-    mut conn: LsConnection,
+    conn: SharedConn,
     policy: AutoReconnect,
     event_tx: Option<mpsc::Sender<StreamingEvent>>,
     session_handle: SessionHandle,
 ) {
     loop {
-        match drain_stream(&mut stream, &registry, &mut conn).await {
+        match drain_stream(&mut stream, &registry, &conn).await {
             DrainOutcome::Rebind => {
                 // ---- Rebind path (existing LOOP behaviour) ----
                 debug!("attempting bind_session");
-                match conn.bind().await {
+                match bind(&conn).await {
                     Ok(new_stream) => {
                         stream = new_stream;
                         resubscribe_all(&conn, &registry).await;
-                        info!(
-                            session_id = %conn.session_id,
-                            "Lightstreamer session rebound"
-                        );
+                        let rebound_id = conn.read().await.session_id.clone();
+                        info!(session_id = %rebound_id, "Lightstreamer session rebound");
                     }
                     Err(e) => {
                         error!(error = %e, "Lightstreamer bind_session failed; giving up");
@@ -491,7 +532,7 @@ async fn read_loop(
 
                 // Auto-reconnect loop.
                 let reconnected = attempt_reconnect(
-                    &mut conn,
+                    &conn,
                     &mut stream,
                     &registry,
                     &policy,
@@ -520,7 +561,7 @@ async fn read_loop(
 ///
 /// Returns `true` if reconnect succeeded, `false` if permanently exhausted.
 async fn attempt_reconnect(
-    conn: &mut LsConnection,
+    conn: &SharedConn,
     stream: &mut LsStream,
     registry: &Registry,
     policy: &AutoReconnect,
@@ -606,19 +647,25 @@ async fn attempt_reconnect(
         };
         let new_password = format!("CST-{}|XST-{}", streaming.cst, streaming.x_security_token);
 
-        conn.password = new_password;
+        // Update the password on the shared connection under a short write
+        // lock (dropped before the create_session await — DD-9).
+        conn.write().await.password = new_password;
 
-        match conn.create_session().await {
+        match create_session(conn).await {
             Ok((new_conn, new_stream)) => {
+                let new_session_id = new_conn.session_id.clone();
                 info!(
                     attempt,
-                    session_id = %new_conn.session_id,
+                    session_id = %new_session_id,
                     "Lightstreamer auto-reconnect: new session established"
                 );
-                *conn = new_conn;
+                // Swap the connection under the write lock, then DROP the guard
+                // synchronously (no await held) so the per-subscription control
+                // calls in resubscribe_all can take the read lock (DD-9).
+                *conn.write().await = new_conn;
                 *stream = new_stream;
 
-                // Re-subscribe all active subscriptions.
+                // Re-subscribe all active subscriptions on the fresh session.
                 resubscribe_all(conn, registry).await;
 
                 emit_event(event_tx, StreamingEvent::Reconnected { attempt }).await;
@@ -638,10 +685,12 @@ async fn attempt_reconnect(
 }
 
 /// Re-subscribe all active entries in the registry on the current connection.
-async fn resubscribe_all(conn: &LsConnection, registry: &Registry) {
+async fn resubscribe_all(conn: &SharedConn, registry: &Registry) {
     let subs = registry.snapshot_for_resubscribe();
     for (idx, name, fields, mode) in subs {
-        if let Err(e) = conn.control("add", idx, &name, &fields, mode).await {
+        // Each control() snapshots the CURRENT session under a short read lock
+        // (DD-9) — never the pre-swap one.
+        if let Err(e) = control(conn, "add", idx, &name, &fields, mode).await {
             warn!(error = %e, "failed to re-subscribe {name} after reconnect");
         }
     }
@@ -659,7 +708,7 @@ async fn emit_event(event_tx: Option<&mpsc::Sender<StreamingEvent>>, event: Stre
 async fn drain_stream(
     stream: &mut LsStream,
     registry: &Registry,
-    conn: &mut LsConnection,
+    conn: &SharedConn,
 ) -> DrainOutcome {
     loop {
         match stream.next_line().await {
@@ -698,14 +747,14 @@ enum FrameAction {
     Terminate,
 }
 
-async fn handle_frame(frame: Frame, registry: &Registry, conn: &mut LsConnection) -> FrameAction {
+async fn handle_frame(frame: Frame, registry: &Registry, conn: &SharedConn) -> FrameAction {
     match frame {
         Frame::Update { item_index, fields } => {
             let alive = registry.apply_update(item_index, &fields);
             if !alive {
                 registry.remove(item_index);
                 // Best-effort unsubscribe — ignore errors.
-                let _ = conn.unsubscribe(item_index).await;
+                let _ = unsubscribe(conn, item_index).await;
             }
             FrameAction::Continue
         }
@@ -733,7 +782,9 @@ async fn handle_frame(frame: Frame, registry: &Registry, conn: &mut LsConnection
         }
         Frame::Ok { session_id } if !session_id.is_empty() => {
             debug!(%session_id, "Lightstreamer OK (bind acknowledged)");
-            conn.session_id = session_id;
+            // Short write lock to record the bind-acknowledged session id;
+            // dropped immediately (no await held).
+            conn.write().await.session_id = session_id;
             FrameAction::Continue
         }
         Frame::Ok { .. } | Frame::Unknown(_) => FrameAction::Continue,
@@ -778,5 +829,53 @@ mod tests {
     #[test]
     fn control_body_empty_returns_ok() {
         assert!(classify_control_body("").is_ok());
+    }
+
+    // --- U3: shared connection session swap (DD-9 / AC-8) ---
+
+    fn test_conn(session_id: &str, control_address: Option<&str>) -> LsConnection {
+        LsConnection {
+            client: Client::new(),
+            endpoint: "https://demo.example".to_owned(),
+            username: "acct".to_owned(),
+            password: "CST-a|XST-b".to_owned(),
+            session_id: session_id.to_owned(),
+            control_address: control_address.map(str::to_owned),
+        }
+    }
+
+    #[tokio::test]
+    async fn request_snapshot_reads_current_session_after_swap() {
+        // A reconnect swaps the inner LsConnection under the write lock; any
+        // subsequent control/subscribe must snapshot the NEW session id, not a
+        // pre-swap clone (the P1-15 stale-conn bug).
+        let conn: SharedConn = Arc::new(RwLock::new(test_conn("S-OLD", Some("ctrl-old"))));
+
+        let before = conn.read().await.request_snapshot();
+        assert_eq!(before.session_id, "S-OLD");
+        assert_eq!(
+            before.control_url,
+            "https://ctrl-old/lightstreamer/control.txt"
+        );
+
+        // Simulate attempt_reconnect's swap: write lock, replace, drop guard.
+        *conn.write().await = test_conn("S-NEW", Some("ctrl-new"));
+
+        let after = conn.read().await.request_snapshot();
+        assert_eq!(after.session_id, "S-NEW");
+        assert_eq!(
+            after.control_url,
+            "https://ctrl-new/lightstreamer/control.txt"
+        );
+    }
+
+    #[tokio::test]
+    async fn request_snapshot_falls_back_to_endpoint_without_control_address() {
+        let conn: SharedConn = Arc::new(RwLock::new(test_conn("S1", None)));
+        let snap = conn.read().await.request_snapshot();
+        assert_eq!(
+            snap.control_url,
+            "https://demo.example/lightstreamer/control.txt"
+        );
     }
 }

@@ -29,7 +29,7 @@ use tracing::instrument;
 use crate::IgClient;
 use crate::error::Result;
 use crate::session::SessionHandle;
-use crate::streaming::connection::{CreateParams, LsConnection};
+use crate::streaming::connection::{self, CreateParams, LsConnection, SharedConn};
 use crate::streaming::events::{
     AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, TradeUpdate,
 };
@@ -161,7 +161,7 @@ impl StreamingApi<'_> {
 /// Call [`StreamingClient::disconnect`] to cleanly tear down the session.
 #[derive(Debug)]
 pub struct StreamingClient {
-    conn: LsConnection,
+    conn: SharedConn,
     registry: Registry,
     shutdown_tx: watch::Sender<bool>,
 }
@@ -186,9 +186,7 @@ impl StreamingClient {
         });
         let item = format!("MARKET:{epic}");
         let fields = MARKET_FIELDS.join(" ");
-        self.conn
-            .control("add", idx, &item, &fields, "MERGE")
-            .await?;
+        connection::control(&self.conn, "add", idx, &item, &fields, "MERGE").await?;
         Ok(rx)
     }
 
@@ -213,9 +211,7 @@ impl StreamingClient {
         });
         let item = format!("CHART:{epic}:TICK");
         let fields = CHART_TICK_FIELDS.join(" ");
-        self.conn
-            .control("add", idx, &item, &fields, "DISTINCT")
-            .await?;
+        connection::control(&self.conn, "add", idx, &item, &fields, "DISTINCT").await?;
         Ok(rx)
     }
 
@@ -242,9 +238,7 @@ impl StreamingClient {
         });
         let item = format!("CHART:{epic}:{}", scale.as_str());
         let fields = CHART_CANDLE_FIELDS.join(" ");
-        self.conn
-            .control("add", idx, &item, &fields, "MERGE")
-            .await?;
+        connection::control(&self.conn, "add", idx, &item, &fields, "MERGE").await?;
         Ok(rx)
     }
 
@@ -268,9 +262,7 @@ impl StreamingClient {
         });
         let item = format!("ACCOUNT:{account_id}");
         let fields = ACCOUNT_FIELDS.join(" ");
-        self.conn
-            .control("add", idx, &item, &fields, "MERGE")
-            .await?;
+        connection::control(&self.conn, "add", idx, &item, &fields, "MERGE").await?;
         Ok(rx)
     }
 
@@ -291,9 +283,7 @@ impl StreamingClient {
         });
         let item = format!("TRADE:{account_id}");
         let fields = TRADE_FIELDS.join(" ");
-        self.conn
-            .control("add", idx, &item, &fields, "DISTINCT")
-            .await?;
+        connection::control(&self.conn, "add", idx, &item, &fields, "DISTINCT").await?;
         Ok(rx)
     }
 
@@ -316,7 +306,11 @@ impl StreamingClient {
     }
 
     /// Return the current Lightstreamer session ID.
-    pub fn session_id(&self) -> &str {
-        &self.conn.session_id
+    ///
+    /// Now `async` and returns an owned `String`: the connection lives behind a
+    /// shared async lock (P1-15) so a reconnect-driven session swap is observed
+    /// here too, rather than a stale clone.
+    pub async fn session_id(&self) -> String {
+        self.conn.read().await.session_id.clone()
     }
 }

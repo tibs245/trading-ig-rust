@@ -92,7 +92,7 @@ mod stream_impl {
 
         // Connect to Lightstreamer (auto-reconnect enabled by default).
         let (stream, _events) = client.streaming().connect().await?;
-        println!("Lightstreamer session: {}", stream.session_id());
+        println!("Lightstreamer session: {}", stream.session_id().await);
 
         // Subscribe to market price updates.
         let mut market_rx = stream.subscribe_market(&epic).await?;
