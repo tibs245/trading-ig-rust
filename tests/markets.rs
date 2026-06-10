@@ -249,6 +249,35 @@ async fn get_single_market_returns_details() {
 }
 
 #[tokio::test]
+async fn get_single_market_no_instrument_name_deserialises() {
+    // The gold CFE MarketDetails payload omits `instrument.name` entirely;
+    // U1 makes `name` Option<String> so this no longer fails with
+    // "missing field name" (P2 gold preflight permanently Inconclusive).
+    let mock = IgMockServer::start().await;
+    mock.mount_login_v3().await;
+    mock.mount_get(
+        "markets/CS.D.CFEGOLD.CFE.IP",
+        3,
+        "markets/get_v3_gold_cfe_no_name.json",
+    )
+    .await;
+
+    let client = mock.client();
+    client.session().login().await.expect("login");
+
+    let epic = Epic::new("CS.D.CFEGOLD.CFE.IP");
+    let details = client.markets().get(&epic).await.expect("get ok");
+
+    assert_eq!(details.instrument.epic, epic);
+    assert_eq!(details.instrument.name, None);
+    assert_eq!(
+        details.instrument.instrument_type,
+        InstrumentType::Commodities
+    );
+    assert_eq!(details.snapshot.market_status, MarketStatus::Tradeable);
+}
+
+#[tokio::test]
 async fn get_single_market_not_found_returns_api_error() {
     let mock = IgMockServer::start().await;
     mock.mount_login_v3().await;

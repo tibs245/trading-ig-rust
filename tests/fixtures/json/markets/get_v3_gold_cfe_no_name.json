@@ -1,0 +1,53 @@
+{
+  "instrument": {
+    "epic": "CS.D.CFEGOLD.CFE.IP",
+    "status": "TRADEABLE",
+    "type": "COMMODITIES",
+    "expiry": "-",
+    "lotSize": 1.0,
+    "unit": "AMOUNT",
+    "high": 2050.0,
+    "low": 2030.0,
+    "percentageChange": 0.12,
+    "netChange": 2.5,
+    "bid": 2045.0,
+    "offer": 2045.6,
+    "updateTime": "15:00:00",
+    "updateTimeUTC": "15:00:00",
+    "delayTime": 0,
+    "streamingPricesAvailable": true,
+    "marketStatus": "TRADEABLE",
+    "scalingFactor": 1,
+    "currencies": [
+      { "code": "USD", "name": "US Dollar", "symbol": "$", "isDefault": true }
+    ],
+    "marginFactor": 0.05,
+    "marginFactorUnit": "PERCENTAGE",
+    "specialInfo": []
+  },
+  "dealingRules": {
+    "minStepDistance": { "unit": "POINTS", "value": 1.0 },
+    "minDealSize": { "unit": "AMOUNT", "value": 0.5 },
+    "minControlledRiskStopDistance": { "unit": "POINTS", "value": 20.0 },
+    "minNormalStopOrLimitDistance": { "unit": "POINTS", "value": 0.0 },
+    "maxStopOrLimitDistance": { "unit": "PERCENTAGE", "value": 75.0 },
+    "controlledRiskSpacing": { "unit": "POINTS", "value": 0.8 },
+    "marketOrderPreference": "AVAILABLE_DEFAULT_ON",
+    "trailingStopsPreference": "AVAILABLE"
+  },
+  "snapshot": {
+    "marketStatus": "TRADEABLE",
+    "netChange": 2.5,
+    "percentageChange": 0.12,
+    "updateTime": "15:00:00",
+    "delayTime": 0,
+    "bid": 2045.0,
+    "offer": 2045.6,
+    "high": 2050.0,
+    "low": 2030.0,
+    "binaryOdds": null,
+    "decimalPlacesFactor": 2,
+    "scalingFactor": 1,
+    "controlledRiskExtraSpread": 0.8
+  }
+}
