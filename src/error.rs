@@ -42,6 +42,14 @@ pub enum Error {
 
     #[error("invalid HTTP header value: {0}")]
     HeaderValue(#[from] http::header::InvalidHeaderValue),
+
+    /// A Lightstreamer control/streaming operation was rejected at the
+    /// protocol level (e.g. a `200 OK` whose body is `ERROR ...` for a dead
+    /// session). Deliberately distinct from [`Error::Auth`]: `is_auth()` must
+    /// stay `false` so the bot's resubscribe path does not trigger a spurious
+    /// token refresh — it should just stay unsubscribed and retry.
+    #[error("streaming error: {0}")]
+    Streaming(String),
 }
 
 /// Wire-level error payload returned by IG.

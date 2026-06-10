@@ -245,7 +245,12 @@ impl LsConnection {
                 String::from_utf8_lossy(&body)
             )));
         }
-        Ok(())
+
+        // Lightstreamer answers `200 OK` with body `ERROR\n<code>\n<msg>` for a
+        // dead/unknown session — the HTTP status alone is not the truth. Without
+        // this the `add` silently "succeeds" and the feed stays dead.
+        let body = resp.bytes().await.map_err(Error::Http)?;
+        classify_control_body(&String::from_utf8_lossy(&body))
     }
 
     /// Send a `control.txt` unsubscribe for the given item index.
@@ -351,6 +356,27 @@ impl LsConnection {
         };
         Ok((new_conn, stream))
     }
+}
+
+// ---------------------------------------------------------------------------
+// control.txt body classification
+// ---------------------------------------------------------------------------
+
+/// Classify a `control.txt` response body.
+///
+/// Lightstreamer returns `200 OK` even for a rejected control request: the
+/// body's first whitespace token discriminates `OK` from `ERROR`/`SYNC ERROR`.
+/// Returns [`Error::Streaming`] (NOT [`Error::Auth`]) on an error body so the
+/// caller stays unsubscribed and retries rather than refreshing tokens.
+fn classify_control_body(body: &str) -> Result<()> {
+    let first_token = body.split_whitespace().next().unwrap_or("");
+    if first_token == "ERROR" || body.trim_start().starts_with("SYNC ERROR") {
+        return Err(Error::Streaming(format!(
+            "Lightstreamer control returned ERROR: {}",
+            body.trim()
+        )));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -711,5 +737,46 @@ async fn handle_frame(frame: Frame, registry: &Registry, conn: &mut LsConnection
             FrameAction::Continue
         }
         Frame::Ok { .. } | Frame::Unknown(_) => FrameAction::Continue,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- U2: control.txt body classification (DD-10 / AC-9) ---
+
+    #[test]
+    fn control_body_error_returns_streaming_err() {
+        let err = classify_control_body("ERROR\n22\nunknown session")
+            .expect_err("ERROR body must be an error");
+        assert!(matches!(err, Error::Streaming(_)));
+        // Must NOT be classified as auth — a control-ERROR must not trigger a
+        // token refresh in the bot's resubscribe path.
+        assert!(!err.is_auth(), "control ERROR must not be is_auth()");
+        assert!(!err.is_rate_limited());
+    }
+
+    #[test]
+    fn control_body_sync_error_returns_streaming_err() {
+        let err = classify_control_body("SYNC ERROR").expect_err("SYNC ERROR is fatal");
+        assert!(matches!(err, Error::Streaming(_)));
+        assert!(!err.is_auth());
+    }
+
+    #[test]
+    fn control_body_ok_returns_ok() {
+        assert!(classify_control_body("OK").is_ok());
+    }
+
+    #[test]
+    fn control_body_numeric_table_ok_returns_ok() {
+        // A subscription confirmation streams a numeric table line, not "ERROR".
+        assert!(classify_control_body("1,1|...").is_ok());
+    }
+
+    #[test]
+    fn control_body_empty_returns_ok() {
+        assert!(classify_control_body("").is_ok());
     }
 }
