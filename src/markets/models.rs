@@ -110,11 +110,7 @@ pub struct InstrumentCurrency {
 pub struct Instrument {
     /// IG market identifier.
     pub epic: Epic,
-    /// Human-readable instrument name.
-    ///
-    /// Optional: the gold CFE `MarketDetails` payload omits `name` entirely;
-    /// a non-`Option` field rejected it with "missing field name".
-    #[serde(default)]
+    /// Human-readable instrument name. Some CFD epics (gold CFE) omit it.
     pub name: Option<String>,
     /// Current trading status.
     pub status: Option<MarketStatus>,
