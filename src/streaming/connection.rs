@@ -473,6 +473,26 @@ async fn read_ok_block(resp: reqwest::Response) -> Result<(String, Option<String
 // Read-loop
 // ---------------------------------------------------------------------------
 
+/// What to do when `bind_session` fails in the rebind path (U4 / DD-11).
+#[derive(Debug, PartialEq, Eq)]
+enum BindFailureAction {
+    /// Auto-reconnect enabled: full session re-create with token refresh.
+    Reconnect,
+    /// Auto-reconnect disabled: emit `Disconnected` and stop (mirrors the
+    /// disabled `SessionEnded` branch).
+    Disconnect,
+}
+
+/// Decide the bind-failure route from the reconnect policy. Pure so the U4
+/// routing is unit-testable without a live Lightstreamer stream (AC-7).
+fn bind_failure_action(policy_enabled: bool) -> BindFailureAction {
+    if policy_enabled {
+        BindFailureAction::Reconnect
+    } else {
+        BindFailureAction::Disconnect
+    }
+}
+
 /// Outcome of draining a stream — determines the read-loop's next action.
 enum DrainOutcome {
     /// Server sent `LOOP` or EOF: call `bind_session` on the same session.
@@ -509,8 +529,40 @@ async fn read_loop(
                         info!(session_id = %rebound_id, "Lightstreamer session rebound");
                     }
                     Err(e) => {
-                        error!(error = %e, "Lightstreamer bind_session failed; giving up");
-                        return;
+                        // U4 (DD-11): a bind failure must not die silently. Route
+                        // it the same way as SessionEnded — full reconnect when
+                        // the policy is enabled, otherwise emit Disconnected.
+                        error!(error = %e, "Lightstreamer bind_session failed");
+                        let reason = format!("bind_session failed: {e}");
+                        match bind_failure_action(policy.enabled) {
+                            BindFailureAction::Disconnect => {
+                                emit_event(
+                                    event_tx.as_ref(),
+                                    StreamingEvent::Disconnected {
+                                        reason: Some(reason),
+                                    },
+                                )
+                                .await;
+                                return;
+                            }
+                            BindFailureAction::Reconnect => {
+                                let reconnected = attempt_reconnect(
+                                    &conn,
+                                    &mut stream,
+                                    &registry,
+                                    &policy,
+                                    event_tx.as_ref(),
+                                    &session_handle,
+                                    Some(reason),
+                                )
+                                .await;
+                                if !reconnected {
+                                    // attempt_reconnect already emitted ReconnectFailed.
+                                    return;
+                                }
+                                // else: fall through and read the fresh stream.
+                            }
+                        }
                     }
                 }
             }
@@ -877,5 +929,19 @@ mod tests {
             snap.control_url,
             "https://demo.example/lightstreamer/control.txt"
         );
+    }
+
+    // --- U4: bind-failure routing (DD-11 / AC-7) ---
+
+    #[test]
+    fn bind_failure_routes_to_reconnect_when_policy_enabled() {
+        // A bind failure with auto-reconnect on must enter attempt_reconnect
+        // (which emits ReconnectFailed on exhaustion) — never a silent return.
+        assert_eq!(bind_failure_action(true), BindFailureAction::Reconnect);
+    }
+
+    #[test]
+    fn bind_failure_emits_disconnected_when_policy_disabled() {
+        assert_eq!(bind_failure_action(false), BindFailureAction::Disconnect);
     }
 }
