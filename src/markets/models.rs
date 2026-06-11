@@ -93,10 +93,11 @@ pub struct DealingRuleValue {
 pub struct InstrumentCurrency {
     /// ISO-4217 currency code.
     pub code: String,
-    /// Human-readable currency name.
-    pub name: String,
-    /// Currency symbol.
-    pub symbol: String,
+    /// Human-readable currency name. Omitted by some live CFD epics
+    /// (gold CFE — same quirk as `Instrument.name`).
+    pub name: Option<String>,
+    /// Currency symbol. Same omission quirk as `name`.
+    pub symbol: Option<String>,
     /// Whether this is the default currency for the instrument.
     pub is_default: bool,
 }
