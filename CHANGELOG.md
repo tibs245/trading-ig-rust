@@ -5,6 +5,22 @@ All notable changes to `trading-ig` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] — 2026-07-21
+
+### Security
+
+- Bumped vulnerable transitive dependencies flagged by `cargo audit` /
+  `cargo deny`. `Cargo.lock` only — no public API change.
+  - `quinn-proto` 0.11.14 → 0.11.16 — RUSTSEC-2026-0185 (remote memory
+    exhaustion via unbounded out-of-order stream reassembly).
+  - `crossbeam-epoch` 0.9.18 → 0.9.20 — RUSTSEC-2026-0204 (invalid
+    pointer dereference in `fmt::Display`).
+  - `anyhow` 1.0.102 → 1.0.104 — RUSTSEC-2026-0190 (unsoundness in
+    `Error::downcast_mut()`).
+  - `memmap2` 0.9.10 → 0.9.11 — RUSTSEC-2026-0186 (unchecked pointer
+    offset).
+  - `spin` 0.9.8 → 0.9.9 — replaces the yanked 0.9.8.
+
 ## [0.1.3] — 2026-06-05
 
 ### Fixed
