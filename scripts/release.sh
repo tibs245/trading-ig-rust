@@ -10,7 +10,8 @@ VERSION="${1:?usage: release.sh X.Y.Z (no leading v)}"
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean" >&2; exit 1; }
 git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && { echo "tag v$VERSION already exists" >&2; exit 1; }
 
-sed -i.bak "0,/^version = \".*\"/s//version = \"$VERSION\"/" Cargo.toml && rm Cargo.toml.bak
+# awk, not `sed -i "0,/re/s//.../"`: that GNU range address is a silent no-op on macOS's BSD sed.
+awk -v v="$VERSION" '!d && /^version = "/{print "version = \"" v "\""; d=1; next} {print}' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 cargo check --quiet   # refresh Cargo.lock
 git add Cargo.toml Cargo.lock
 git commit -m "chore(release): v$VERSION"
