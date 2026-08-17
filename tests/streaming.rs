@@ -14,7 +14,9 @@
 
 use std::time::Duration;
 
-use trading_ig::streaming::events::{CandleScale, MarketUpdate, PriceUpdate};
+use trading_ig::streaming::events::{
+    AccountUpdate, CandleScale, ChartCandleUpdate, MarketUpdate, PriceUpdate,
+};
 use trading_ig::streaming::protocol::{FieldValue, Frame, parse_line, parse_ok_block};
 use trading_ig::streaming::{AutoReconnect, StreamingEvent};
 
@@ -238,6 +240,75 @@ fn price_update_all_null_fields() {
     assert_eq!(u.offer, None);
     assert_eq!(u.dlg_flag, None);
     assert_eq!(u.timestamp, None);
+}
+
+// ---------------------------------------------------------------------------
+// CHART candle / ACCOUNT — the two from_raw the diff extends
+// ---------------------------------------------------------------------------
+
+#[test]
+fn chart_candle_from_raw_maps_every_field() {
+    let state: Vec<Option<String>> = (0..22).map(|i| Some(i.to_string())).collect();
+    let u = ChartCandleUpdate::from_raw("E", CandleScale::FiveMinute, &state);
+
+    assert_eq!(u.epic, "E");
+    assert_eq!(u.scale, Some(CandleScale::FiveMinute));
+    assert_eq!(u.ofr_open, Some(0.0));
+    assert_eq!(u.ofr_close, Some(3.0));
+    assert_eq!(u.bid_open, Some(4.0));
+    assert_eq!(u.bid_close, Some(7.0));
+    assert_eq!(u.ltp_open, Some(8.0));
+    assert_eq!(u.ltp_close, Some(11.0));
+    assert_eq!(u.cons_tick_count, Some(13));
+    assert_eq!(u.utm, Some(14));
+    // The seven fields the PRICE migration added — appended after UTM.
+    assert_eq!(u.ltv, Some(15.0));
+    assert_eq!(u.ttv, Some(16.0));
+    assert_eq!(u.day_open_mid, Some(17.0));
+    assert_eq!(u.day_net_chg_mid, Some(18.0));
+    assert_eq!(u.day_perc_chg_mid, Some(19.0));
+    assert_eq!(u.day_high, Some(20.0));
+    assert_eq!(u.day_low, Some(21.0));
+}
+
+#[test]
+fn chart_candle_cons_end_is_tri_state() {
+    let mut state: Vec<Option<String>> = vec![None; 22];
+    assert_eq!(
+        ChartCandleUpdate::from_raw("E", CandleScale::Hour, &state).cons_end,
+        None
+    );
+    state[12] = Some("1".into());
+    assert_eq!(
+        ChartCandleUpdate::from_raw("E", CandleScale::Hour, &state).cons_end,
+        Some(true)
+    );
+    state[12] = Some("0".into());
+    assert_eq!(
+        ChartCandleUpdate::from_raw("E", CandleScale::Hour, &state).cons_end,
+        Some(false)
+    );
+}
+
+#[test]
+fn account_from_raw_maps_every_field() {
+    let state: Vec<Option<String>> = (0..12).map(|i| Some(i.to_string())).collect();
+    let u = AccountUpdate::from_raw("ABC123", &state);
+
+    assert_eq!(u.account_id, "ABC123");
+    assert_eq!(u.pnl, Some(0.0));
+    assert_eq!(u.deposit, Some(1.0));
+    assert_eq!(u.available_cash, Some(2.0));
+    assert_eq!(u.funds, Some(3.0));
+    assert_eq!(u.margin, Some(4.0));
+    assert_eq!(u.margin_lr, Some(5.0));
+    assert_eq!(u.margin_nlr, Some(6.0));
+    assert_eq!(u.available_to_deal, Some(7.0));
+    assert_eq!(u.equity, Some(8.0));
+    assert_eq!(u.equity_used, Some(9.0));
+    // Appended by the PRICE migration; must not disturb indices 0-9 above.
+    assert_eq!(u.pnl_lr, Some(10.0));
+    assert_eq!(u.pnl_nlr, Some(11.0));
 }
 
 #[test]

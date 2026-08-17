@@ -500,16 +500,39 @@ mod tests {
         assert!(spec.fields.contains("ASKPRICE1"));
     }
 
-    /// Every non-PRICE family must stay on the default adapter.
+    /// Every non-PRICE family must stay on the default adapter — a stray
+    /// `LS_data_adapter` would silently route them to the wrong item family.
     #[test]
     fn non_price_wire_params_have_no_data_adapter() {
-        let spec = kind_wire_params(
-            1,
-            &SubscriptionKind::Account {
+        let kinds = [
+            SubscriptionKind::Market {
+                epic: "E".into(),
+                tx: tokio::sync::mpsc::channel(1).0,
+            },
+            SubscriptionKind::ChartTick {
+                epic: "E".into(),
+                tx: tokio::sync::mpsc::channel(1).0,
+            },
+            SubscriptionKind::ChartCandle {
+                epic: "E".into(),
+                scale: crate::streaming::events::CandleScale::Second,
+                tx: tokio::sync::mpsc::channel(1).0,
+            },
+            SubscriptionKind::Account {
                 account_id: "D".into(),
                 tx: tokio::sync::mpsc::channel(1).0,
             },
-        );
-        assert_eq!(spec.data_adapter, None);
+            SubscriptionKind::Trade {
+                account_id: "D".into(),
+                tx: tokio::sync::mpsc::channel(1).0,
+            },
+        ];
+        for kind in &kinds {
+            let spec = kind_wire_params(1, kind);
+            assert_eq!(
+                spec.data_adapter, None,
+                "{kind:?} must use the default adapter"
+            );
+        }
     }
 }
