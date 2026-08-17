@@ -310,27 +310,34 @@ impl LsConnection {
 // control.txt requests against the shared connection
 // ---------------------------------------------------------------------------
 
+/// Everything `control.txt` needs to (re-)open one subscription.
+pub(crate) struct SubscribeSpec {
+    pub(crate) item_index: usize,
+    pub(crate) item_name: String,
+    pub(crate) fields: String,
+    pub(crate) mode: &'static str,
+    /// Data adapter within the `DEFAULT` adapter set. `None` leaves the server
+    /// default; `PRICE` items require `Some("Pricing")`.
+    pub(crate) data_adapter: Option<&'static str>,
+}
+
 /// Send a `control.txt` request (subscribe / unsubscribe) using the CURRENT
 /// session in `conn`. Snapshots session id + url under a short read lock, drops
 /// the guard, THEN awaits the HTTP — never holding the lock across `.await`.
-pub(crate) async fn control(
-    conn: &SharedConn,
-    op: &str,
-    item_index: usize,
-    item_name: &str,
-    fields: &str,
-    mode: &str,
-) -> Result<()> {
+pub(crate) async fn control(conn: &SharedConn, op: &str, spec: &SubscribeSpec) -> Result<()> {
     let snap = conn.read().await.request_snapshot();
 
-    let item_index_str = item_index.to_string();
+    let item_index_str = spec.item_index.to_string();
     let mut params = HashMap::new();
     params.insert("LS_session", snap.session_id.as_str());
     params.insert("LS_op", op);
     params.insert("LS_table", item_index_str.as_str());
-    params.insert("LS_id", item_name);
-    params.insert("LS_schema", fields);
-    params.insert("LS_mode", mode);
+    params.insert("LS_id", spec.item_name.as_str());
+    params.insert("LS_schema", spec.fields.as_str());
+    params.insert("LS_mode", spec.mode);
+    if let Some(adapter) = spec.data_adapter {
+        params.insert("LS_data_adapter", adapter);
+    }
 
     let resp = snap
         .client
@@ -738,12 +745,11 @@ async fn attempt_reconnect(
 
 /// Re-subscribe all active entries in the registry on the current connection.
 async fn resubscribe_all(conn: &SharedConn, registry: &Registry) {
-    let subs = registry.snapshot_for_resubscribe();
-    for (idx, name, fields, mode) in subs {
+    for spec in registry.snapshot_for_resubscribe() {
         // Each control() snapshots the CURRENT session under a short read lock
         // (DD-9) — never the pre-swap one.
-        if let Err(e) = control(conn, "add", idx, &name, &fields, mode).await {
-            warn!(error = %e, "failed to re-subscribe {name} after reconnect");
+        if let Err(e) = control(conn, "add", &spec).await {
+            warn!(error = %e, "failed to re-subscribe {} after reconnect", spec.item_name);
         }
     }
 }

@@ -5,6 +5,57 @@ All notable changes to `trading-ig` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 0.1.6
+
+### Deprecated
+
+- **`StreamingClient::subscribe_market`.** IG deprecated the Lightstreamer
+  `MARKET` subscription (and its `L1` alias): end of life 1 May 2026,
+  decommissioned 8 May 2026. Use
+  [`subscribe_price`](src/streaming/client.rs) instead. The method carries
+  `#[deprecated]` and also emits a `tracing::warn!` once per process, so
+  already-deployed bots see the notice in their logs and not just at
+  compile time.
+
+### Added
+
+- **`PRICE` subscription** — `subscribe_price(epic)` and
+  `subscribe_price_for_account(account_id, epic)`, returning the new
+  `PriceUpdate`. The item name is `PRICE:<accountId>:<epic>` and the
+  subscription selects the `Pricing` data adapter.
+- **`LS_data_adapter` on `control.txt`.** The Lightstreamer control request
+  can now select a data adapter; `PRICE` is the only family that needs one.
+- `PriceUpdate` exposes the 5-tier dealing ladder (`bid_prices`,
+  `ask_prices`, `bid_sizes`, `ask_sizes`), the dealing quote IDs
+  (`bid_quote_id`, `ask_quote_id`) and the ladder currency — none of which
+  `MARKET` provided.
+- `CandleScale::Second`, matching the `SECOND` scale IG documents.
+- Seven `CHART:<epic>:<scale>` fields that were missing from the candle
+  subscription: `LTV`, `TTV`, `DAY_OPEN_MID`, `DAY_NET_CHG_MID`,
+  `DAY_PERC_CHG_MID`, `DAY_HIGH`, `DAY_LOW`.
+- `ACCOUNT` fields `PNL_LR` / `PNL_NLR` (`AccountUpdate::pnl_lr` /
+  `pnl_nlr`).
+
+### Changed
+
+- **Breaking (pre-1.0):** `ChartCandleUpdate` and `AccountUpdate` gained
+  public fields, so exhaustive struct literals and patterns need updating.
+  Both derive `Default`, so `..Default::default()` is the cheap fix.
+- `examples/streaming_market.rs` renamed to `examples/streaming_price.rs`
+  and switched to `subscribe_price`.
+
+### Migration notes
+
+`MARKET` → `PRICE` is not a rename. Beyond the item name gaining the
+account id, two fields change meaning: `UPDATE_TIME` (UK-local
+`HH:MM:SS` string) becomes `timestamp` (UTC milliseconds), and
+`MARKET_STATE` becomes `dlg_flag`, which uses a different vocabulary
+(`DEAL` where `MARKET` said `TRADEABLE`). Full mapping table in
+`_knowledge/api/streaming.md`.
+
+`LS_data_adapter=Pricing` is taken from IG's published reference and has
+not yet been exercised against a live demo session.
+
 ## [0.1.5] — 2026-07-21
 
 ### Security

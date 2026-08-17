@@ -14,7 +14,7 @@
 
 use std::time::Duration;
 
-use trading_ig::streaming::events::{CandleScale, MarketUpdate};
+use trading_ig::streaming::events::{CandleScale, MarketUpdate, PriceUpdate};
 use trading_ig::streaming::protocol::{FieldValue, Frame, parse_line, parse_ok_block};
 use trading_ig::streaming::{AutoReconnect, StreamingEvent};
 
@@ -151,8 +151,98 @@ fn market_update_market_delay_truthy() {
     assert_eq!(update.market_delay, Some(true));
 }
 
+// ---------------------------------------------------------------------------
+// PRICE — the supported replacement for the deprecated MARKET subscription
+// ---------------------------------------------------------------------------
+
+/// Build a 31-slot PRICE field state with only the named indices populated.
+fn price_state(pairs: &[(usize, &str)]) -> Vec<Option<String>> {
+    let mut state: Vec<Option<String>> = vec![None; 31];
+    for (i, v) in pairs {
+        state[*i] = Some((*v).to_string());
+    }
+    state
+}
+
+#[test]
+fn price_update_from_raw_maps_ladder_and_top_of_book() {
+    let state = price_state(&[
+        (0, "1.08500"),
+        (1, "1.08490"),
+        (5, "1.08510"),
+        (6, "1.08520"),
+        (10, "50"),
+        (15, "75"),
+        (20, "1.08505"),
+        (21, "1.09000"),
+        (22, "1.08000"),
+        (23, "0.00005"),
+        (24, "0.00462"),
+        (25, "1755432000000"),
+        (26, "0"),
+        (27, "DEAL"),
+        (28, "BQ-1"),
+        (29, "AQ-1"),
+        (30, "GBP"),
+    ]);
+    let u = PriceUpdate::from_raw("ABC123", "CS.D.EURUSD.CFD.IP", &state);
+
+    assert_eq!(u.account_id, "ABC123");
+    assert_eq!(u.epic, "CS.D.EURUSD.CFD.IP");
+    // Top of book must alias tier 1 of each ladder.
+    assert_eq!(u.bid, Some(1.085));
+    assert_eq!(u.offer, Some(1.0851));
+    assert_eq!(u.bid_prices[0], Some(1.085));
+    assert_eq!(u.bid_prices[1], Some(1.0849));
+    assert_eq!(u.ask_prices[1], Some(1.0852));
+    assert_eq!(u.bid_sizes[0], Some(50.0));
+    assert_eq!(u.ask_sizes[0], Some(75.0));
+    assert_eq!(u.mid_open, Some(1.08505));
+    assert_eq!(u.high, Some(1.09));
+    assert_eq!(u.low, Some(1.08));
+    assert_eq!(u.change, Some(0.00005));
+    assert_eq!(u.change_pct, Some(0.00462));
+    // TIMESTAMP is UTC millis, not the HH:MM:SS string MARKET used to send.
+    assert_eq!(u.timestamp, Some(1_755_432_000_000));
+    assert_eq!(u.delayed, Some(false));
+    assert_eq!(u.dlg_flag.as_deref(), Some("DEAL"));
+    assert_eq!(u.bid_quote_id.as_deref(), Some("BQ-1"));
+    assert_eq!(u.ask_quote_id.as_deref(), Some("AQ-1"));
+    assert_eq!(u.currency.as_deref(), Some("GBP"));
+}
+
+#[test]
+fn price_update_without_ladder_leaves_sizes_none() {
+    // Instruments with no configured ladder send no BIDSIZE/ASKSIZE at all.
+    let state = price_state(&[(0, "1.08500"), (5, "1.08510")]);
+    let u = PriceUpdate::from_raw("ABC123", "TEST", &state);
+    assert_eq!(u.bid, Some(1.085));
+    assert!(u.bid_sizes.iter().all(Option::is_none));
+    assert!(u.ask_sizes.iter().all(Option::is_none));
+    assert_eq!(u.currency, None);
+}
+
+#[test]
+fn price_update_delay_flag_truthy() {
+    let state = price_state(&[(26, "1")]);
+    assert_eq!(
+        PriceUpdate::from_raw("A", "TEST", &state).delayed,
+        Some(true)
+    );
+}
+
+#[test]
+fn price_update_all_null_fields() {
+    let u = PriceUpdate::from_raw("A", "TEST", &vec![None; 31]);
+    assert_eq!(u.bid, None);
+    assert_eq!(u.offer, None);
+    assert_eq!(u.dlg_flag, None);
+    assert_eq!(u.timestamp, None);
+}
+
 #[test]
 fn candle_scale_display() {
+    assert_eq!(CandleScale::Second.as_str(), "SECOND");
     assert_eq!(CandleScale::OneMinute.as_str(), "1MINUTE");
     assert_eq!(CandleScale::FiveMinute.as_str(), "5MINUTE");
     assert_eq!(CandleScale::Hour.as_str(), "HOUR");
