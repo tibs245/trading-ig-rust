@@ -42,7 +42,7 @@ pub(crate) mod subscription;
 
 pub use client::{StreamingApi, StreamingClient};
 pub use events::{
-    AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, PriceUpdate,
-    TradeUpdate,
+    AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate,
+    PRICE_LADDER_TIERS, PriceUpdate, TradeUpdate,
 };
 pub use reconnect::{AutoReconnect, StreamingEvent};

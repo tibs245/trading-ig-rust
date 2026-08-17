@@ -620,3 +620,103 @@ impl TradeUpdate {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Each *_FIELDS array IS the wire order sent as LS_schema, and every
+    // from_raw indexes it positionally. Reordering one without the other makes
+    // `bid` return a ladder size — silently, with every other test still green.
+    // These anchors are the only thing that catches that.
+
+    #[test]
+    fn price_field_order_is_pinned() {
+        assert_eq!(PRICE_FIELDS.len(), 31);
+        assert_eq!(PRICE_FIELDS[PRICE_BID_PRICE_BASE], "BIDPRICE1");
+        assert_eq!(PRICE_FIELDS[PRICE_BID_PRICE_BASE + 4], "BIDPRICE5");
+        assert_eq!(PRICE_FIELDS[PRICE_ASK_PRICE_BASE], "ASKPRICE1");
+        assert_eq!(PRICE_FIELDS[PRICE_ASK_PRICE_BASE + 4], "ASKPRICE5");
+        assert_eq!(PRICE_FIELDS[PRICE_BID_SIZE_BASE], "BIDSIZE1");
+        assert_eq!(PRICE_FIELDS[PRICE_BID_SIZE_BASE + 4], "BIDSIZE5");
+        assert_eq!(PRICE_FIELDS[PRICE_ASK_SIZE_BASE], "ASKSIZE1");
+        assert_eq!(PRICE_FIELDS[PRICE_ASK_SIZE_BASE + 4], "ASKSIZE5");
+        assert_eq!(
+            &PRICE_FIELDS[20..],
+            &[
+                "MID_OPEN",
+                "HIGH",
+                "LOW",
+                "NET_CHG",
+                "NET_CHG_PCT",
+                "TIMESTAMP",
+                "DELAY",
+                "DLG_FLAG",
+                "BIDQUOTEID",
+                "ASKQUOTEID",
+                "CURRENCY0",
+            ]
+        );
+    }
+
+    #[test]
+    fn market_field_order_is_pinned() {
+        assert_eq!(
+            MARKET_FIELDS,
+            &[
+                "BID",
+                "OFFER",
+                "HIGH",
+                "LOW",
+                "MID_OPEN",
+                "CHANGE",
+                "CHANGE_PCT",
+                "UPDATE_TIME",
+                "MARKET_DELAY",
+                "MARKET_STATE",
+            ]
+        );
+    }
+
+    #[test]
+    fn chart_candle_field_order_is_pinned() {
+        assert_eq!(CHART_CANDLE_FIELDS.len(), 22);
+        assert_eq!(CHART_CANDLE_FIELDS[0], "OFR_OPEN");
+        assert_eq!(CHART_CANDLE_FIELDS[12], "CONS_END");
+        assert_eq!(CHART_CANDLE_FIELDS[14], "UTM");
+        assert_eq!(
+            &CHART_CANDLE_FIELDS[15..],
+            &[
+                "LTV",
+                "TTV",
+                "DAY_OPEN_MID",
+                "DAY_NET_CHG_MID",
+                "DAY_PERC_CHG_MID",
+                "DAY_HIGH",
+                "DAY_LOW",
+            ]
+        );
+    }
+
+    #[test]
+    fn chart_tick_field_order_is_pinned() {
+        assert_eq!(CHART_TICK_FIELDS.len(), 11);
+        assert_eq!(CHART_TICK_FIELDS[0], "BID");
+        assert_eq!(CHART_TICK_FIELDS[5], "UTM");
+        assert_eq!(CHART_TICK_FIELDS[10], "DAY_LOW");
+    }
+
+    #[test]
+    fn account_field_order_is_pinned() {
+        assert_eq!(ACCOUNT_FIELDS.len(), 12);
+        assert_eq!(ACCOUNT_FIELDS[0], "PNL");
+        assert_eq!(ACCOUNT_FIELDS[9], "EQUITY_USED");
+        assert_eq!(ACCOUNT_FIELDS[10], "PNL_LR");
+        assert_eq!(ACCOUNT_FIELDS[11], "PNL_NLR");
+    }
+
+    #[test]
+    fn trade_field_order_is_pinned() {
+        assert_eq!(TRADE_FIELDS, &["CONFIRMS", "OPU", "WOU"]);
+    }
+}

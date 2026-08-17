@@ -168,7 +168,9 @@ pub struct StreamingClient {
     conn: SharedConn,
     registry: Registry,
     shutdown_tx: watch::Sender<bool>,
-    /// Account the session is switched to — the `PRICE` item name embeds it.
+    /// Account this Lightstreamer session authenticated as. Deliberately a
+    /// connect-time snapshot: a later `switch_account` does not re-authenticate
+    /// the stream, so the server still knows us as this account.
     account_id: String,
 }
 
@@ -189,23 +191,24 @@ impl StreamingClient {
     // Price
     // ------------------------------------------------------------------
 
-    /// Subscribe to `PRICE:<accountId>:<epic>` for the logged-in account.
-    ///
-    /// This is the supported replacement for the deprecated
+    /// Subscribe to `PRICE:<accountId>:<epic>` for the account this stream
+    /// was connected with — *not* whichever account the REST session was last
+    /// switched to. Replaces the deprecated
     /// [`subscribe_market`](Self::subscribe_market).
     ///
     /// Each received value is a snapshot of all changed fields merged with the
     /// previous state — no field is ever "missing".
     #[instrument(skip(self), fields(%epic))]
     pub async fn subscribe_price(&self, epic: &str) -> Result<mpsc::Receiver<PriceUpdate>> {
-        self.subscribe_price_for_account(&self.account_id.clone(), epic)
+        self.subscribe_price_for_account(&self.account_id, epic)
             .await
     }
 
     /// Subscribe to `PRICE:<accountId>:<epic>` for an explicit account.
     ///
-    /// Use when streaming prices for an account other than the one the
-    /// session is currently switched to.
+    /// Escape hatch for callers that track account ids themselves. IG may
+    /// reject an account the Lightstreamer session did not authenticate as —
+    /// unverified against a live session.
     #[instrument(skip(self), fields(%account_id, %epic))]
     pub async fn subscribe_price_for_account(
         &self,

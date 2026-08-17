@@ -29,7 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ask_prices`, `bid_sizes`, `ask_sizes`), the dealing quote IDs
   (`bid_quote_id`, `ask_quote_id`) and the ladder currency — none of which
   `MARKET` provided.
-- `CandleScale::Second`, matching the `SECOND` scale IG documents.
 - Seven `CHART:<epic>:<scale>` fields that were missing from the candle
   subscription: `LTV`, `TTV`, `DAY_OPEN_MID`, `DAY_NET_CHG_MID`,
   `DAY_PERC_CHG_MID`, `DAY_HIGH`, `DAY_LOW`.
@@ -41,8 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (pre-1.0):** `ChartCandleUpdate` and `AccountUpdate` gained
   public fields, so exhaustive struct literals and patterns need updating.
   Both derive `Default`, so `..Default::default()` is the cheap fix.
+- **Breaking (pre-1.0):** `CandleScale` gained a `Second` variant, matching
+  the `SECOND` scale IG documents. The enum is not `#[non_exhaustive]`, so
+  an exhaustive `match` on it stops compiling until the arm is added.
+- **Breaking for `#![deny(warnings)]` crates:** the `#[deprecated]` on
+  `subscribe_market` turns into a hard error there. Intentional — the
+  subscription is past IG's decommission date.
 - `examples/streaming_market.rs` renamed to `examples/streaming_price.rs`
   and switched to `subscribe_price`.
+- `subscribe_price` uses the account the Lightstreamer session
+  authenticated with at `connect()`, which a later `switch_account` does
+  not change. Use `subscribe_price_for_account` to override.
 
 ### Migration notes
 
