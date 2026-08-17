@@ -1,5 +1,8 @@
 //! Live streaming smoke test — connects to the IG demo API and subscribes to
-//! EUR/USD market updates, printing 5 updates then disconnecting.
+//! EUR/USD PRICE updates, printing 5 updates then disconnecting.
+//!
+//! Uses the `PRICE` subscription. The older `MARKET` subscription is
+//! deprecated by IG (EOL 1 May 2026, decommissioned 8 May 2026).
 //!
 //! # Requirements
 //!
@@ -11,7 +14,7 @@
 //! ```bash
 //! # Source your .env file, then run:
 //! ( set -a; . /path/to/.env; set +a; \
-//!   cargo run --features stream --quiet --example streaming_market )
+//!   cargo run --features stream --quiet --example streaming_price )
 //! ```
 //!
 //! # Required environment variables
@@ -24,12 +27,12 @@
 //! | `IG_ACC_TYPE`    | `DEMO` or `LIVE` (default: DEMO)  |
 //! | `IG_EPIC`        | Epic to subscribe to (optional)   |
 //!
-//! The example exits cleanly after receiving 5 market updates or after a 30 s timeout.
+//! The example exits cleanly after receiving 5 price updates or after a 30 s timeout.
 //!
 //! # Note
 //!
 //! This example requires the `stream` feature:
-//! `cargo run --features stream --example streaming_market`
+//! `cargo run --features stream --example streaming_price`
 
 // When the stream feature is enabled, compile the real streaming main.
 #[cfg(feature = "stream")]
@@ -41,7 +44,7 @@ mod stream_impl {
 
     pub async fn run() -> Result<()> {
         tracing_subscriber::fmt()
-            .with_env_filter("trading_ig=debug,streaming_market=info")
+            .with_env_filter("trading_ig=debug,streaming_price=info")
             .try_init()
             .ok();
 
@@ -94,9 +97,9 @@ mod stream_impl {
         let (stream, _events) = client.streaming().connect().await?;
         println!("Lightstreamer session: {}", stream.session_id().await);
 
-        // Subscribe to market price updates.
-        let mut market_rx = stream.subscribe_market(&epic).await?;
-        println!("Subscribed to MARKET:{epic}");
+        // Subscribe to PRICE updates (MARKET is deprecated by IG).
+        let mut price_rx = stream.subscribe_price(&epic).await?;
+        println!("Subscribed to PRICE:{}:{epic}", session_info.account_id);
 
         // Also subscribe to 1-minute candles as a second subscription.
         let mut candle_rx = stream
@@ -110,15 +113,15 @@ mod stream_impl {
 
         loop {
             tokio::select! {
-                Some(update) = market_rx.recv() => {
+                Some(update) = price_rx.recv() => {
                     println!(
-                        "[market] {}: bid={:?} offer={:?} state={:?} delay={:?} time={:?}",
+                        "[price] {}: bid={:?} offer={:?} dlg_flag={:?} delayed={:?} ts={:?}",
                         update.epic,
                         update.bid,
                         update.offer,
-                        update.market_state,
-                        update.market_delay,
-                        update.update_time,
+                        update.dlg_flag,
+                        update.delayed,
+                        update.timestamp,
                     );
                     count += 1;
                     if count >= 5 {
@@ -163,7 +166,7 @@ async fn main() {
 fn main() {
     eprintln!(
         "This example requires the `stream` Cargo feature.\n\
-         Run with: cargo run --features stream --example streaming_market"
+         Run with: cargo run --features stream --example streaming_price"
     );
     std::process::exit(1);
 }

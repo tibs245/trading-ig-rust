@@ -23,7 +23,7 @@
 //! client.session().login_v2().await?;
 //!
 //! let (stream, _events) = client.streaming().connect().await?;
-//! let mut rx = stream.subscribe_market("CS.D.GBPUSD.TODAY.IP").await?;
+//! let mut rx = stream.subscribe_price("CS.D.GBPUSD.TODAY.IP").await?;
 //!
 //! while let Some(update) = rx.recv().await {
 //!     println!("{} bid={:?} offer={:?}", update.epic, update.bid, update.offer);
@@ -42,6 +42,7 @@ pub(crate) mod subscription;
 
 pub use client::{StreamingApi, StreamingClient};
 pub use events::{
-    AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, TradeUpdate,
+    AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, PriceUpdate,
+    TradeUpdate,
 };
 pub use reconnect::{AutoReconnect, StreamingEvent};

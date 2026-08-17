@@ -16,22 +16,25 @@
 //! #     .build()?;
 //! client.session().login_v2().await?;
 //! let (stream, _events) = client.streaming().connect_with(Default::default()).await?;
-//! let mut rx = stream.subscribe_market("CS.D.GBPUSD.TODAY.IP").await?;
+//! let mut rx = stream.subscribe_price("CS.D.GBPUSD.TODAY.IP").await?;
 //! while let Some(update) = rx.recv().await {
 //!     println!("{} bid={:?}", update.epic, update.bid);
 //! }
 //! # Ok(()) }
 //! ```
 
+use std::sync::Once;
+
 use tokio::sync::{mpsc, watch};
-use tracing::instrument;
+use tracing::{instrument, warn};
 
 use crate::IgClient;
 use crate::error::Result;
 use crate::session::SessionHandle;
 use crate::streaming::connection::{self, CreateParams, LsConnection, SharedConn};
 use crate::streaming::events::{
-    AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, TradeUpdate,
+    AccountUpdate, CandleScale, ChartCandleUpdate, ChartTickUpdate, MarketUpdate, PriceUpdate,
+    TradeUpdate,
 };
 use crate::streaming::reconnect::{AutoReconnect, StreamingEvent};
 use crate::streaming::subscription::{Registry, SubscriptionKind};
@@ -128,7 +131,7 @@ impl StreamingApi<'_> {
 
         let conn = LsConnection::create(CreateParams {
             endpoint,
-            username: account_id,
+            username: account_id.clone(),
             password,
             registry: registry.clone(),
             shutdown_tx: shutdown_tx.clone(),
@@ -142,6 +145,7 @@ impl StreamingApi<'_> {
             conn,
             registry,
             shutdown_tx,
+            account_id,
         };
         Ok((client, event_rx))
     }
@@ -164,29 +168,81 @@ pub struct StreamingClient {
     conn: SharedConn,
     registry: Registry,
     shutdown_tx: watch::Sender<bool>,
+    /// Account the session is switched to — the `PRICE` item name embeds it.
+    account_id: String,
+}
+
+/// `#[deprecated]` only fires at compile time; long-running bots that already
+/// call `subscribe_market` need to see the EOL in their logs too.
+fn warn_market_deprecated() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        warn!(
+            "MARKET subscription is deprecated by IG (EOL 1 May 2026, \
+             decommissioned 8 May 2026) — migrate to subscribe_price()"
+        );
+    });
 }
 
 impl StreamingClient {
     // ------------------------------------------------------------------
-    // Market
+    // Price
+    // ------------------------------------------------------------------
+
+    /// Subscribe to `PRICE:<accountId>:<epic>` for the logged-in account.
+    ///
+    /// This is the supported replacement for the deprecated
+    /// [`subscribe_market`](Self::subscribe_market).
+    ///
+    /// Each received value is a snapshot of all changed fields merged with the
+    /// previous state — no field is ever "missing".
+    #[instrument(skip(self), fields(%epic))]
+    pub async fn subscribe_price(&self, epic: &str) -> Result<mpsc::Receiver<PriceUpdate>> {
+        self.subscribe_price_for_account(&self.account_id.clone(), epic)
+            .await
+    }
+
+    /// Subscribe to `PRICE:<accountId>:<epic>` for an explicit account.
+    ///
+    /// Use when streaming prices for an account other than the one the
+    /// session is currently switched to.
+    #[instrument(skip(self), fields(%account_id, %epic))]
+    pub async fn subscribe_price_for_account(
+        &self,
+        account_id: &str,
+        epic: &str,
+    ) -> Result<mpsc::Receiver<PriceUpdate>> {
+        let (tx, rx) = mpsc::channel(CHANNEL_CAP);
+        let spec = self.registry.register(SubscriptionKind::Price {
+            account_id: account_id.to_owned(),
+            epic: epic.to_owned(),
+            tx,
+        });
+        connection::control(&self.conn, "add", &spec).await?;
+        Ok(rx)
+    }
+
+    // ------------------------------------------------------------------
+    // Market — DEPRECATED by IG
     // ------------------------------------------------------------------
 
     /// Subscribe to market price updates for `epic`.
     ///
-    /// Returns a `Receiver<MarketUpdate>`.  Each received value is a snapshot
-    /// of all changed fields merged with the previous state — no field is
-    /// ever "missing".
+    /// Returns a `Receiver<MarketUpdate>`.
+    #[deprecated(
+        since = "0.1.6",
+        note = "IG deprecated the MARKET subscription: end of life 1 May 2026, \
+                decommissioned 8 May 2026. Use `subscribe_price` instead."
+    )]
     #[instrument(skip(self), fields(%epic))]
     pub async fn subscribe_market(&self, epic: &str) -> Result<mpsc::Receiver<MarketUpdate>> {
-        use crate::streaming::events::MARKET_FIELDS;
+        warn_market_deprecated();
         let (tx, rx) = mpsc::channel(CHANNEL_CAP);
-        let idx = self.registry.register(SubscriptionKind::Market {
+        let spec = self.registry.register(SubscriptionKind::Market {
             epic: epic.to_owned(),
             tx,
         });
-        let item = format!("MARKET:{epic}");
-        let fields = MARKET_FIELDS.join(" ");
-        connection::control(&self.conn, "add", idx, &item, &fields, "MERGE").await?;
+        connection::control(&self.conn, "add", &spec).await?;
         Ok(rx)
     }
 
@@ -203,15 +259,12 @@ impl StreamingClient {
         &self,
         epic: &str,
     ) -> Result<mpsc::Receiver<ChartTickUpdate>> {
-        use crate::streaming::events::CHART_TICK_FIELDS;
         let (tx, rx) = mpsc::channel(CHANNEL_CAP);
-        let idx = self.registry.register(SubscriptionKind::ChartTick {
+        let spec = self.registry.register(SubscriptionKind::ChartTick {
             epic: epic.to_owned(),
             tx,
         });
-        let item = format!("CHART:{epic}:TICK");
-        let fields = CHART_TICK_FIELDS.join(" ");
-        connection::control(&self.conn, "add", idx, &item, &fields, "DISTINCT").await?;
+        connection::control(&self.conn, "add", &spec).await?;
         Ok(rx)
     }
 
@@ -229,16 +282,13 @@ impl StreamingClient {
         epic: &str,
         scale: CandleScale,
     ) -> Result<mpsc::Receiver<ChartCandleUpdate>> {
-        use crate::streaming::events::CHART_CANDLE_FIELDS;
         let (tx, rx) = mpsc::channel(CHANNEL_CAP);
-        let idx = self.registry.register(SubscriptionKind::ChartCandle {
+        let spec = self.registry.register(SubscriptionKind::ChartCandle {
             epic: epic.to_owned(),
             scale,
             tx,
         });
-        let item = format!("CHART:{epic}:{}", scale.as_str());
-        let fields = CHART_CANDLE_FIELDS.join(" ");
-        connection::control(&self.conn, "add", idx, &item, &fields, "MERGE").await?;
+        connection::control(&self.conn, "add", &spec).await?;
         Ok(rx)
     }
 
@@ -254,15 +304,12 @@ impl StreamingClient {
         &self,
         account_id: &str,
     ) -> Result<mpsc::Receiver<AccountUpdate>> {
-        use crate::streaming::events::ACCOUNT_FIELDS;
         let (tx, rx) = mpsc::channel(CHANNEL_CAP);
-        let idx = self.registry.register(SubscriptionKind::Account {
+        let spec = self.registry.register(SubscriptionKind::Account {
             account_id: account_id.to_owned(),
             tx,
         });
-        let item = format!("ACCOUNT:{account_id}");
-        let fields = ACCOUNT_FIELDS.join(" ");
-        connection::control(&self.conn, "add", idx, &item, &fields, "MERGE").await?;
+        connection::control(&self.conn, "add", &spec).await?;
         Ok(rx)
     }
 
@@ -275,15 +322,12 @@ impl StreamingClient {
     /// Returns a `Receiver<TradeUpdate>`.
     #[instrument(skip(self), fields(%account_id))]
     pub async fn subscribe_trade(&self, account_id: &str) -> Result<mpsc::Receiver<TradeUpdate>> {
-        use crate::streaming::events::TRADE_FIELDS;
         let (tx, rx) = mpsc::channel(CHANNEL_CAP);
-        let idx = self.registry.register(SubscriptionKind::Trade {
+        let spec = self.registry.register(SubscriptionKind::Trade {
             account_id: account_id.to_owned(),
             tx,
         });
-        let item = format!("TRADE:{account_id}");
-        let fields = TRADE_FIELDS.join(" ");
-        connection::control(&self.conn, "add", idx, &item, &fields, "DISTINCT").await?;
+        connection::control(&self.conn, "add", &spec).await?;
         Ok(rx)
     }
 
